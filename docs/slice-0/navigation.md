@@ -7,7 +7,7 @@ The Alpha app uses four top-level destinations:
 1. **Explore** — featured stories, search, filters, map, and timeline.
 2. **Create** — start a story, answer a daily question, or record an interview.
 3. **Families** — family and community history collections.
-4. **Profile** — account, language, privacy, storage, and help.
+4. **Profile** — account, language, privacy, appearance, storage, and help.
 
 Authentication and consent are entry flows, not top-level destinations.
 

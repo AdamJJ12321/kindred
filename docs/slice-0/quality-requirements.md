@@ -8,6 +8,14 @@
 - Provide a list-based alternative for map exploration.
 - Provide captions or transcripts for audio and video where available.
 
+## Visual theme
+
+- The default appearance is a restrained light theme using familiar Material components and modest accent colors.
+- Profile settings provide `System`, `Light`, and `Dark` choices.
+- Persist the choice locally before sign-in and with the user profile after sign-in.
+- Test every primary screen and state in both light and dark modes, including map markers, timeline cards, dialogs, upload progress, and errors.
+- Do not use color alone to communicate evidence type, visibility, recording state, or processing status.
+
 ## Consent and safety
 
 - Explain recording, storage, AI processing, and sharing in plain language before consent.

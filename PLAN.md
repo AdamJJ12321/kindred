@@ -29,6 +29,10 @@ Organize the app by feature rather than by screen:
 
 Use repository interfaces between UI and data services. Alpha repositories use mock data; Beta repositories use Firebase without requiring a rewrite of the screens.
 
+### Visual theme
+
+Use a restrained, familiar default light theme with standard Flutter/Material controls, readable typography, and modest color accents. Provide a dark-mode option from Profile settings, with `system`, `light`, and `dark` preferences persisted per user or locally before sign-in. All screens, media states, map overlays, timeline cards, dialogs, and error states must define both light and dark colors without relying on brightness-sensitive images or low-contrast text.
+
 ### Firebase backend
 
 - Firebase Authentication for accounts and sign-in.
@@ -207,6 +211,7 @@ The MVP is the full feature set: authenticated accounts, story creation, photogr
 - Map and timeline tests for date ranges, approximate locations, clustering, filters, and privacy.
 - AI evaluation tests for transcript fidelity, translation quality, names, dates, accents, code-switching, and hallucination avoidance.
 - Accessibility tests for screen readers, text scaling, contrast, captions, and non-map alternatives.
+- Theme tests for light mode, dark mode, system preference changes, contrast, and persisted theme selection.
 - Performance tests for long recordings, low storage, weak connectivity, and older phones.
 
 ## Release sequence
