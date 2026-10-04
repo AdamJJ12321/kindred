@@ -7,7 +7,8 @@ Kindred is a Flutter mobile app backed by Firebase where people preserve and exp
 - Treat oral accounts and documented records as complementary forms of history.
 - Make provenance visible: every story identifies whether it is a firsthand memory, oral account, documented fact, or unverified story.
 - Preserve original evidence alongside generated or edited text.
-- Keep family histories private by default, with explicit public-sharing controls.
+- Make stories public by default, with an author-controlled privacy choice before posting or afterward.
+- Make family groups automatically public; privacy is controlled per story inside the group.
 - Build in vertical slices so every milestone produces a usable experience.
 
 ## Shared technical foundation
@@ -22,7 +23,7 @@ Organize the app by feature rather than by screen:
 - `recording`: microphone permissions, recording, playback, and upload state.
 - `map`: location-based exploration.
 - `timeline`: chronological exploration and event grouping.
-- `families`: private and public family-history collections.
+- `families`: public family-history collections with per-story privacy.
 - `daily_questions`: prompts and answers.
 - `processing`: transcription, summaries, translation, and job status.
 
@@ -46,7 +47,8 @@ Each story should support:
 - Exact or approximate dates and one or more locations with coordinates and readable place names.
 - Photographs, recordings, documents, and other evidence.
 - Related people, families, events, and stories.
-- Visibility: private, family-only, invited users, or public.
+- Visibility: public, private, family-only, or invited users.
+- Store only fields needed by an active app feature; retain timestamps primarily for users, stories, and timeline events.
 - Review status, edit history, and original content alongside any generated text.
 
 ## Iterative development slices
@@ -76,7 +78,7 @@ Include:
 - Create-story flow with mock photograph, document, and recording attachments.
 - Interactive mock history map with tappable story markers.
 - Interactive mock timeline with chronological story cards.
-- Family-history view showing private and public collections.
+- Family-history view showing public collections with individually public or private stories.
 - Recording screen with simulated recording and playback states.
 - Daily-question card with a locally stored answer flow.
 - Search and filters for story type, evidence type, date, family, and location.
@@ -158,12 +160,12 @@ Timeline capabilities:
 
 ### Slice 4: Family histories and sharing
 
-Implement private and public family-history collections:
+Implement public family-history collections with per-story privacy:
 
 - Create family or community collections.
-- Invite members and assign owner, editor, contributor, and viewer roles.
+- Invite members and assign owner, editor, or contributor roles.
 - Add or remove stories from collections.
-- Private, invite-only, and public collection visibility.
+- Collection visibility is always public; individual stories can be public or private.
 - Contribution approval, access revocation, and story removal.
 - Export or archive family-history data.
 
@@ -193,7 +195,7 @@ AI-generated text must remain distinguishable from the original account and edit
 
 ## MVP scope
 
-The MVP is the full feature set: authenticated accounts, story creation, photographs, recordings, documents, evidence classification, Firebase persistence and security, map, timeline, private and public family histories, daily questions, transcription, summaries, translation, search, filtering, sharing, deletion, privacy controls, accessibility support, analytics, crash reporting, and comprehensive testing.
+The MVP is the full feature set: authenticated accounts, story creation, photographs, recordings, documents, evidence classification, Firebase persistence and security, map, timeline, public family groups with per-story privacy, daily questions, transcription, summaries, translation, search, filtering, sharing, deletion, privacy controls, accessibility support, analytics, crash reporting, and comprehensive testing.
 
 ## Testing strategy
 
@@ -224,6 +226,7 @@ The MVP is the full feature set: authenticated accounts, story creation, photogr
 
 - Flutter targets iOS and Android first.
 - Firebase is the required backend; Firebase Emulator Suite is used during development.
-- Stories are private by default and become public only through explicit user action.
+- Stories are public by default; authors can choose private, family-only, or invited visibility before posting or change it later.
+- Family groups are automatically public and cannot be made private; stories within them retain independent visibility.
 - The app supports approximate dates and locations for uncertain or sensitive histories.
 - Public archives, classroom dashboards, collaborative editing, and broad multilingual support can follow the MVP unless pilot requirements elevate them.

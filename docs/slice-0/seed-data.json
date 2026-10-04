@@ -18,7 +18,7 @@
       "id": "family_chen",
       "name": "The Chen Family",
       "description": "Stories and memories shared by the Chen family.",
-      "visibility": "private",
+      "visibility": "public",
       "ownerId": "user_student_001"
     }
   ],

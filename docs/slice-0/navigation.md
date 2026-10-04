@@ -33,9 +33,9 @@ The recording flow must communicate who is being recorded, what will happen to t
 
 ### Build a family history
 
-`Families → Create collection → Invite members → Add stories → Collection map/timeline`
+`Families → Create public collection → Invite members → Add stories → Collection map/timeline`
 
-Collections can be private, invite-only, or public. Collection membership never overrides a story’s more restrictive visibility.
+Family collections are always public. Collection membership never overrides a story’s more restrictive visibility.
 
 ### Answer the daily question
 

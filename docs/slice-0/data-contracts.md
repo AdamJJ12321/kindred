@@ -23,7 +23,7 @@ title: string
 description?: string
 storyType: oral | local | family | cultural | personal
 evidenceType: firsthand_memory | oral_account | documented_fact | unverified_story
-visibility: private | family | invited | public
+visibility: public | private | family | invited
 status: draft | published | archived | deleted
 date?: { kind: exact | approximate | range, start: timestamp, end?: timestamp }
 location?: { label: string, latitude: number, longitude: number, precision: exact | neighborhood | city | region }
@@ -44,7 +44,6 @@ fileName: string
 caption?: string
 sourceNote?: string
 uploadedBy: string
-createdAt: timestamp
 ```
 
 ### `families/{familyId}`
@@ -52,19 +51,16 @@ createdAt: timestamp
 ```text
 name: string
 description?: string
-visibility: private | invited | public
+visibility: public
 ownerId: string
-createdAt: timestamp
-updatedAt: timestamp
 ```
 
 ### `families/{familyId}/members/{userId}`
 
 ```text
-role: owner | editor | contributor | viewer
+role: owner | editor | contributor
 status: invited | active | removed
 invitedBy: string
-createdAt: timestamp
 ```
 
 ### `timelineEvents/{eventId}`
@@ -87,7 +83,6 @@ prompt: string
 category: childhood | food | work | migration | local_place | celebration | other
 language: string
 activeDate: string # YYYY-MM-DD in the target time zone
-createdAt: timestamp
 ```
 
 ### `answers/{answerId}`
@@ -98,10 +93,8 @@ creatorId: string
 kind: text | photograph | audio | recording
 content?: string
 evidenceId?: string
-visibility: private | family | invited | public
+visibility: public | private | family | invited
 storyId?: string
-createdAt: timestamp
-updatedAt: timestamp
 ```
 
-Generated transcript, summary, translation, and extraction results belong in `stories/{storyId}/artifacts/{artifactId}` with `kind`, `sourceLanguage`, `targetLanguage?`, `provider`, `modelVersion`, `status`, `content`, and `reviewedBy?`.
+Generated transcript, summary, translation, and extraction results belong in `stories/{storyId}/artifacts/{artifactId}` with only `kind`, `sourceLanguage`, `targetLanguage?`, `provider`, `modelVersion`, `status`, `content`, and `reviewedBy?`. Do not add timestamps to evidence, memberships, questions, answers, or artifacts unless a shipped feature displays or relies on them. Users, stories, and timeline events retain timestamps for profile age, chronology, and event ordering.

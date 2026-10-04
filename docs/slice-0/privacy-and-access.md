@@ -2,12 +2,13 @@
 
 ## Visibility
 
+- **Public:** stories are public by default. The author can change visibility before posting or at any time afterward.
 - **Private:** only the creator and explicitly authorized service operations can read the story and its evidence.
 - **Family:** active members of a referenced family collection can read it; the creator retains access.
 - **Invited:** only accepted invitees can read it; invitation access can be revoked.
 - **Public:** any authenticated or anonymous reader allowed by the product surface can read the published story. The creator must explicitly publish it.
 
-More restrictive story visibility wins over collection visibility. A public family collection does not make a private story public.
+Family groups are always public and cannot be changed to private. A story inside a family group keeps its own visibility, so a private story remains private even when its family group is public.
 
 ## Ownership and roles
 
@@ -15,7 +16,6 @@ More restrictive story visibility wins over collection visibility. A public fami
 - Family owners manage membership and collection settings.
 - Editors can curate collection stories but cannot change another creator’s story visibility without creator authorization.
 - Contributors can add stories subject to the collection’s approval policy.
-- Viewers can read permitted content but cannot edit or invite.
 
 ## Consent
 
