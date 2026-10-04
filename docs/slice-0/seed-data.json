@@ -1,0 +1,87 @@
+{
+  "users": [
+    {
+      "id": "user_student_001",
+      "displayName": "Maya Chen",
+      "preferredLanguage": "en",
+      "timeZone": "America/Los_Angeles"
+    },
+    {
+      "id": "user_storyteller_001",
+      "displayName": "Lina Chen",
+      "preferredLanguage": "zh",
+      "timeZone": "America/Los_Angeles"
+    }
+  ],
+  "families": [
+    {
+      "id": "family_chen",
+      "name": "The Chen Family",
+      "description": "Stories and memories shared by the Chen family.",
+      "visibility": "private",
+      "ownerId": "user_student_001"
+    }
+  ],
+  "stories": [
+    {
+      "id": "story_railway_kitchen",
+      "creatorId": "user_student_001",
+      "title": "Sunday noodles near the old railway",
+      "description": "A family recipe and the neighborhood where it became a tradition.",
+      "storyType": "family",
+      "evidenceType": "oral_account",
+      "visibility": "family",
+      "status": "published",
+      "familyIds": ["family_chen"],
+      "location": {
+        "label": "Oakland Chinatown",
+        "latitude": 37.7941,
+        "longitude": -122.2712,
+        "precision": "neighborhood"
+      }
+    },
+    {
+      "id": "story_market_fire",
+      "creatorId": "user_storyteller_001",
+      "title": "The market fire of 1968",
+      "description": "A remembered account of the night the neighborhood market burned.",
+      "storyType": "local",
+      "evidenceType": "firsthand_memory",
+      "visibility": "public",
+      "status": "published",
+      "familyIds": [],
+      "location": {
+        "label": "Oakland, California",
+        "latitude": 37.8044,
+        "longitude": -122.2712,
+        "precision": "city"
+      }
+    },
+    {
+      "id": "story_unverified_bridge",
+      "creatorId": "user_student_001",
+      "title": "The lantern under the bridge",
+      "description": "A story passed between neighbors that still needs supporting evidence.",
+      "storyType": "local",
+      "evidenceType": "unverified_story",
+      "visibility": "private",
+      "status": "draft",
+      "familyIds": [],
+      "location": {
+        "label": "East Bay",
+        "latitude": 37.8044,
+        "longitude": -122.2712,
+        "precision": "region"
+      }
+    }
+  ],
+  "dailyQuestions": [
+    {
+      "id": "question_first_kitchen",
+      "prompt": "What is a meal that takes you back to a particular place or person?",
+      "category": "food",
+      "language": "en",
+      "activeDate": "2026-01-01"
+    }
+  ]
+}
