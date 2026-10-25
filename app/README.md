@@ -1,17 +1,32 @@
-# app
+# Kindred Beta setup
 
-A new Flutter project.
+## Firebase project
 
-## Getting Started
+The Flutter app is configured for Firebase project `my1stapp-b4b47`.
 
-This project is a starting point for a Flutter application.
+Platform configuration is stored in:
 
-A few resources to get you started if this is your first Flutter project:
+- `lib/firebase_options.dart`
+- `android/app/google-services.json`
+- `ios/Runner/GoogleService-Info.plist`
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+Firestore configuration is stored in `firebase.json`, `firestore.rules`, and `firestore.indexes.json`.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Local checks
+
+From this directory:
+
+```bash
+flutter pub get
+flutter test
+```
+
+## Firebase deployment
+
+After authenticating with Firebase CLI and selecting `my1stapp-b4b47`, deploy the Beta rules and indexes from this directory:
+
+```bash
+firebase deploy --only firestore:rules,firestore:indexes
+```
+
+The Firestore story repository is in `lib/data/story_repository.dart`. It intentionally keeps the Alpha mock data available while the Explore screen is migrated to live streams in the next Beta step.

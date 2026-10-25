@@ -15,6 +15,8 @@
 - Persist the choice locally before sign-in and with the user profile after sign-in.
 - Test every primary screen and state in both light and dark modes, including map markers, timeline cards, dialogs, upload progress, and errors.
 - Do not use color alone to communicate evidence type, visibility, recording state, or processing status.
+- Badges, points, and progress describe contribution or exploration only; they never score the truth, sensitivity, or popularity of a story.
+- Provide non-gamified paths to record, browse, and preserve stories.
 
 ## Consent and safety
 

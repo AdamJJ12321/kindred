@@ -2,12 +2,14 @@
 
 ## Primary navigation
 
-The Alpha app uses four top-level destinations:
+The Alpha app uses four top-level destinations and one persistent create action:
 
-1. **Explore** — featured stories, search, filters, map, and timeline.
-2. **Create** — start a story, answer a daily question, or record an interview.
-3. **Families** — family and community history collections.
-4. **Profile** — account, language, privacy, appearance, storage, and help.
+1. **Explore** — map-first discovery with feed and timeline alternatives.
+2. **Quests** — optional daily questions and place-based prompts.
+3. **Community** — public stories and creator attribution.
+4. **Collection/Profile** — saved stories, recordings, contribution history, badges, account, language, privacy, appearance, storage, and help.
+
+The persistent create action opens a sheet with **Share a story**, **Record an interview**, and **Answer today’s question**. Families remain accessible from Collection/Profile and story detail.
 
 Authentication and consent are entry flows, not top-level destinations.
 
@@ -42,6 +44,12 @@ Family collections are always public. Collection membership never overrides a st
 `Create or Home card → Daily question → Text/photo/recording answer → Keep private or turn into story`
 
 An answer retains its original question and creator when converted into a story.
+
+### Explore a quest
+
+`Quests → Prompt or nearby place → Story/map detail → Save progress or create a story`
+
+Quests are optional prompts. Completion can be reflected in a personal collection, but never changes a story’s visibility or access.
 
 ## Required screen states
 

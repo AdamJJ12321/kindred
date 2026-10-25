@@ -10,6 +10,8 @@ Kindred is a Flutter mobile app backed by Firebase where people preserve and exp
 - Make stories public by default, with an author-controlled privacy choice before posting or afterward.
 - Make family groups automatically public; privacy is controlled per story inside the group.
 - Build in vertical slices so every milestone produces a usable experience.
+- Make discovery place-based and human: the map is the primary home for local stories, with timeline and feed as alternate paths.
+- Reward participation with gentle progress markers without ranking the sensitivity, truth, or popularity of someone’s history.
 
 ## Shared technical foundation
 
@@ -32,6 +34,8 @@ Use repository interfaces between UI and data services. Alpha repositories use m
 ### Visual theme
 
 Use a restrained, familiar default light theme with standard Flutter/Material controls, readable typography, and modest color accents. Provide a dark-mode option from Profile settings, with `system`, `light`, and `dark` preferences persisted per user or locally before sign-in. All screens, media states, map overlays, timeline cards, dialogs, and error states must define both light and dark colors without relying on brightness-sensitive images or low-contrast text.
+
+Use the supplied Pastport reference as visual direction rather than a literal screen specification: warm paper-like neutrals, deep teal recording and navigation surfaces, restrained terracotta and gold accents, editorial display typography paired with readable sans-serif body text, rounded cards, and prominent photographic evidence. Keep controls familiar and accessible; texture, badges, and map styling remain secondary to story readability.
 
 ### Firebase backend
 
@@ -68,6 +72,7 @@ Deliverables:
 - Privacy and visibility rules.
 - Development, staging, and production Firebase environments.
 - Representative seed data for family memories, local events, documented facts, and unverified stories.
+- Visual direction and screen inventory covering Explore Map, Story, Record, Timeline, Quest Board, Community, Collection, Families, and Profile.
 - Accessibility, media-retention, consent, and deletion requirements.
 
 ### Alpha: designed app with mock data
@@ -82,6 +87,10 @@ Include:
 - Create-story flow with mock photograph, document, and recording attachments.
 - Interactive mock history map with tappable story markers.
 - Interactive mock timeline with chronological story cards.
+- Recording as the primary create action, with a visible central record control and guided prompt state.
+- Quest Board for optional daily questions and place-based history prompts.
+- Community feed for public stories with creator attribution and evidence labels.
+- Collection and Profile views showing saved stories, recordings, badges, and contribution history without turning sensitive stories into a leaderboard.
 - Family-history view showing public collections with individually public or private stories.
 - Recording screen with simulated recording and playback states.
 - Daily-question card with a locally stored answer flow.
@@ -96,6 +105,7 @@ Alpha acceptance criteria:
 - The interface clearly distinguishes memory, oral account, documented fact, and unverified story.
 - Empty, loading, error, and no-results states are designed.
 - Widget and golden tests cover primary navigation and story creation.
+- The map, record action, and story evidence are visually prominent in the default Explore experience.
 
 ### Beta: Firebase connection and persistence
 
@@ -162,6 +172,8 @@ Timeline capabilities:
 - Family and community timeline modes.
 - Filters, search, and links between timeline events and map locations.
 
+Optional place-based discovery overlays can add nearby prompts, progress indicators, and quests after the core map and timeline are stable. Every quest interaction must have an accessible list alternative.
+
 ### Slice 4: Family histories and sharing
 
 Implement public family-history collections with per-story privacy:
@@ -173,6 +185,8 @@ Implement public family-history collections with per-story privacy:
 - Contribution approval, access revocation, and story removal.
 - Export or archive family-history data.
 
+Add a separate public Community surface for public stories. Community follows, reactions, and badges are opt-in and secondary to reading and preserving the story.
+
 ### Slice 5: Daily questions
 
 Introduce recurring prompts as an engagement layer:
@@ -182,6 +196,8 @@ Introduce recurring prompts as an engagement layer:
 - Text, photo, and recording answers.
 - Save as a private draft or convert to a story.
 - Question history, reminders, moderation, and reporting.
+
+Daily questions can appear in the Quest Board as a low-pressure participation loop. Users can answer privately; public participation is never required.
 
 ### Slice 6: AI enrichment and advanced discovery
 
@@ -199,7 +215,7 @@ AI-generated text must remain distinguishable from the original account and edit
 
 ## MVP scope
 
-The MVP is the full feature set: authenticated accounts, story creation, photographs, recordings, documents, evidence classification, Firebase persistence and security, map, timeline, public family groups with per-story privacy, daily questions, transcription, summaries, translation, search, filtering, sharing, deletion, privacy controls, accessibility support, analytics, crash reporting, and comprehensive testing.
+The MVP is the full feature set: authenticated accounts, story creation, photographs, recordings, documents, evidence classification, Firebase persistence and security, map, timeline, public family groups with per-story privacy, daily questions, optional Quest Board prompts, a moderated Community feed for public stories, transcription, summaries, translation, search, filtering, sharing, deletion, privacy controls, accessibility support, analytics, crash reporting, and comprehensive testing. Collection metrics and badges remain lightweight contribution summaries rather than competitive rankings.
 
 ## Testing strategy
 
