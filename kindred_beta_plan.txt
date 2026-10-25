@@ -1,0 +1,128 @@
+# Kindred — Beta portion A (steps 1–3 only)
+
+Work in: `c:\Users\jackh\Desktop\Coding Minds Project\Highschool Project\Adam\kindred`
+Primary app: `app/`
+Plan: `PLAN.md` (Beta section)
+Contracts: `docs/slice-0/data-contracts.md`, `docs/slice-0/environments.md`, `docs/slice-0/seed-data.json`
+UI: A Pastport-style UI upgrade was just finished — **preserve that visual design**. Do not simplify or restyle screens; only wire data/auth behind them.
+
+## Scope (do ALL of this; stop after it)
+
+Complete **only** these three Beta next steps:
+
+1. Wire Explore (and other story-driven screens) to **Firestore live streams** instead of `mockStories`.
+2. **Firebase Authentication** — register, sign in, sign out, and password recovery.
+3. Add Firestore repositories for **users, families, questions, and timeline events** (stories already exists; extend it as needed).
+
+**Out of scope for this pass (do not implement):**
+- Firebase Storage / media uploads
+- Full Security Rules hardening + automated Rules test suite
+- Emulator Suite seed pipeline beyond what’s needed to verify Auth + streams
+- Slice 1+ features (real evidence workflow, real recording, AI, etc.)
+
+---
+
+## A. Firebase tooling & project setup (do first)
+
+Install/verify tools on this Windows machine as needed:
+
+1. **Node.js / npm** if missing (needed for Firebase CLI).
+2. **Firebase CLI**: install or update (`npm install -g firebase-tools`), then `firebase login` if not authenticated.
+3. **FlutterFire CLI**: install/update (`dart pub global activate flutterfire_cli`). Ensure `flutterfire` is on PATH.
+4. From `app/`, confirm Flutter deps and regenerate Firebase config against project **`my1stapp-b4b47`**:
+   - Run `flutterfire configure` for the platforms you support (at least **web**, **android**, **ios** — Edge/`flutter run -d edge` is in active use).
+   - Overwrite/refresh `lib/firebase_options.dart`, `android/app/google-services.json`, `ios/Runner/GoogleService-Info.plist` as FlutterFire produces them.
+5. Enable products in the Firebase console / via CLI as needed for this pass:
+   - **Authentication** with Email/Password
+   - **Cloud Firestore**
+6. From `app/`, deploy current rules/indexes after any rule updates:
+   - `firebase deploy --only firestore:rules,firestore:indexes`
+7. Add Flutter packages as needed (at minimum):
+   - `firebase_auth`
+   - keep/update `firebase_core`, `cloud_firestore`
+8. Update `app/README.md` with exact setup/login/deploy commands that worked.
+
+If CLI prompts for interactive login or project selection, stop and tell the user what to approve — then continue after they finish.
+
+---
+
+## B. Step 1 — Live Firestore streams (replace mock story lists)
+
+Current state:
+- `lib/data/story_repository.dart` has `FirestoreStoryRepository` with `watchPublicStories`, `createStory`, `setVisibility`.
+- `lib/main.dart` still uses global `mockStories` for Explore filters / create insert / several flows; `LiveStoryFeed` already streams public stories.
+
+Requirements:
+- Map Firestore documents ↔ the existing UI `Story` model (align field names with `docs/slice-0/data-contracts.md`: `storyType`, `evidenceType`, `visibility`, `status`, etc.).
+- Explore filters, story detail navigation, map pins, and create/publish should read/write Firestore — **not** mutate an in-memory mock list as source of truth.
+- Keep mock/seed **only** as a temporary offline fallback or remove once streams work; prefer live data.
+- Handle loading / empty / error states without breaking the upgraded UI.
+- Creating a story must use the signed-in user’s `uid` as `creatorId` (after Auth lands).
+- Expand `FirestoreStoryRepository` as needed (watch by id, watch filtered, update, soft states) while staying contract-compatible.
+
+---
+
+## C. Step 2 — Firebase Auth
+
+Implement a minimal but complete auth UX that fits the existing Profile / shell:
+- Register (email + password)
+- Sign in
+- Sign out
+- Password recovery (send reset email)
+- Gate create/publish behind signed-in state; browsing public stories can remain available when signed out if rules allow.
+- On first successful register/sign-in, ensure a `users/{uid}` profile document exists (see contracts).
+- Persist auth state via `FirebaseAuth.instance.authStateChanges()` and reflect it in Profile (display name/email, sign-out).
+- Do not block the whole app behind a splash forever — show clear signed-out vs signed-in Profile/Create behavior.
+
+---
+
+## D. Step 3 — Additional repositories
+
+Add repository classes under `app/lib/data/` (mirror `story_repository.dart` style):
+
+| Repo | Collection(s) | Minimum API |
+|---|---|---|
+| Users | `users/{userId}` | get/watch profile, upsert on auth |
+| Families | `families`, `families/{id}/members` | watch public families, create family, list members |
+| Questions | `dailyQuestions` (+ `answers` if needed) | watch active/recent questions |
+| Timeline | `timelineEvents` | watch events ordered by date |
+
+Wire at least one screen each where UI already exists:
+- Families page → families repo
+- Profile → users repo
+- Explore/timeline-ish surfaces → timeline + stories (even a simple chronological list is fine if no dedicated Timeline route yet)
+- Daily question / Quest surface if present → questions repo; otherwise expose a small Profile or Explore card that reads questions
+
+Follow `docs/slice-0/data-contracts.md` field shapes. Add Firestore indexes if queries require them; update `firestore.indexes.json` and deploy.
+
+Update `firestore.rules` only as needed so Auth + these reads/writes work for this pass (signed-in create on stories/users/families; public read where contracts say public). Do **not** build the full automated Rules test suite yet.
+
+---
+
+## E. Verification
+
+1. `flutter pub get`
+2. `flutter analyze` / fix issues you introduce
+3. `flutter test`
+4. Manual check on Edge (`flutter run -d edge`):
+   - Register → profile doc created
+   - Sign out / sign in / reset email flow doesn’t crash
+   - Explore shows Firestore stories (seed a few via console or a one-time seed helper if empty)
+   - Create story appears in the live feed
+   - Families / questions / timeline repos return without runtime errors
+
+Update `app/README.md` with Auth + repo notes and any new CLI steps.
+
+---
+
+## Done when
+
+- [ ] Firebase CLI + FlutterFire used; config regenerated for `my1stapp-b4b47`
+- [ ] Email/password Auth works (register, sign in, sign out, recover)
+- [ ] Explore/create use Firestore streams/writes, not `mockStories` as source of truth
+- [ ] User, family, question, and timeline repositories exist and are used by UI
+- [ ] Rules/indexes deployed if changed
+- [ ] README updated
+- [ ] Tests pass / analyze clean for touched code
+
+Commit only if I ask. Prefer small, focused file changes; keep the upgraded UI intact.
