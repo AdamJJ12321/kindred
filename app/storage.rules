@@ -1,0 +1,29 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() { return request.auth != null; }
+    function story() {
+      return firestore.get(/databases/(default)/documents/stories/$(storyId)).data;
+    }
+    function canReadStory() {
+      return story().status == 'published' && (
+        story().visibility == 'public' ||
+        (signedIn() && story().creatorId == request.auth.uid) ||
+        (signedIn() && story().visibility == 'invited' && story().allowedUserIds.hasAny([request.auth.uid])) ||
+        (signedIn() && story().visibility == 'family' && story().familyMemberIds.hasAny([request.auth.uid]))
+      );
+    }
+
+    match /stories/{storyId}/evidence/{fileName} {
+      allow read: if canReadStory();
+      allow write: if signedIn()
+        && story().creatorId == request.auth.uid
+        && request.resource.size < 100 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*|audio/.*|video/.*|application/pdf|text/.*');
+      allow delete: if signedIn() && story().creatorId == request.auth.uid;
+    }
+
+    match /{allPaths=**} { allow read, write: if false; }
+  }
+}

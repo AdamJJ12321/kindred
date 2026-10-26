@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 
+import 'data/auth_repository.dart';
+import 'data/evidence_repository.dart';
 import 'data/story_repository.dart';
 import 'firebase_options.dart';
 
@@ -21,6 +25,10 @@ class KindredApp extends StatefulWidget {
 class _KindredAppState extends State<KindredApp> {
   ThemeMode _themeMode = ThemeMode.light;
 
+  static const parchment = Color(0xfff5ecdd);
+  static const ink = Color(0xff173b43);
+  static const terracotta = Color(0xffc8543d);
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -28,9 +36,19 @@ class _KindredAppState extends State<KindredApp> {
       debugShowCheckedModeBanner: false,
       themeMode: _themeMode,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xff496b52)),
+        colorScheme: ColorScheme.fromSeed(seedColor: ink, primary: ink, secondary: terracotta, surface: parchment),
         useMaterial3: true,
-        scaffoldBackgroundColor: const Color(0xfffaf9f6),
+        scaffoldBackgroundColor: parchment,
+        fontFamily: 'Avenir',
+        textTheme: const TextTheme(
+          headlineMedium: TextStyle(fontFamily: 'Georgia', color: ink),
+          headlineSmall: TextStyle(fontFamily: 'Georgia', color: ink),
+          titleLarge: TextStyle(fontFamily: 'Georgia', color: ink),
+          titleMedium: TextStyle(color: ink),
+          bodyLarge: TextStyle(color: Color(0xff38545a)),
+        ),
+        cardTheme: CardThemeData(color: Color(0xfffffbf4), elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(18)))),
+        navigationBarTheme: const NavigationBarThemeData(backgroundColor: Color(0xfffffbf4), indicatorColor: Color(0xffdbe6df)),
       ),
       darkTheme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
@@ -38,6 +56,17 @@ class _KindredAppState extends State<KindredApp> {
           brightness: Brightness.dark,
         ),
         useMaterial3: true,
+        fontFamily: 'Avenir',
+        scaffoldBackgroundColor: const Color(0xff101d20),
+        textTheme: const TextTheme(
+          headlineMedium: TextStyle(fontFamily: 'Georgia', color: Color(0xfff5f1e8)),
+          headlineSmall: TextStyle(fontFamily: 'Georgia', color: Color(0xfff5f1e8)),
+          titleLarge: TextStyle(fontFamily: 'Georgia', color: Color(0xfff5f1e8)),
+          titleMedium: TextStyle(color: Color(0xfff5f1e8)),
+          bodyLarge: TextStyle(color: Color(0xffe2e9e5)),
+          bodyMedium: TextStyle(color: Color(0xffd2ded8)),
+        ),
+        cardTheme: CardThemeData(color: Color(0xff1b2d30), elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(18)))),
       ),
       home: HomeShell(
         themeMode: _themeMode,
@@ -136,7 +165,9 @@ class _HomeShellState extends State<HomeShell> {
       CreatePage(
         onStoryCreated: (story) {
           setState(() {
-            mockStories.insert(0, story);
+            if (Firebase.apps.isEmpty || FirebaseAuth.instance.currentUser == null) {
+              mockStories.insert(0, story);
+            }
             _selected = 0;
           });
         },
@@ -189,7 +220,7 @@ class ExplorePage extends StatefulWidget {
 
 class _ExplorePageState extends State<ExplorePage> {
   bool _map = false;
-  bool _live = false;
+  bool _live = Firebase.apps.isNotEmpty;
   String _filter = 'All';
 
   @override
@@ -612,6 +643,14 @@ class _StoryFormState extends State<StoryForm> {
   String _type = 'Family';
   String _evidence = 'Oral account';
   String _visibility = 'Public';
+  final _files = <PlatformFile>[];
+  bool _publishing = false;
+  double? _uploadProgress;
+
+  Future<void> _pickEvidence() async {
+    final result = await FilePicker.platform.pickFiles(allowMultiple: true, withData: true, type: FileType.any);
+    if (result != null) setState(() => _files.addAll(result.files));
+  }
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Share a story')),
@@ -683,14 +722,41 @@ class _StoryFormState extends State<StoryForm> {
         ),
         const SizedBox(height: 18),
         OutlinedButton.icon(
-          onPressed: () {},
+          onPressed: _pickEvidence,
           icon: const Icon(Icons.attach_file),
-          label: const Text('Add photograph, recording, or document'),
+          label: Text(_files.isEmpty ? 'Add photograph, recording, or document' : '${_files.length} evidence file(s) selected'),
         ),
+        if (_uploadProgress != null) ...[
+          const SizedBox(height: 12),
+          LinearProgressIndicator(value: _uploadProgress),
+          const SizedBox(height: 4),
+          Text('${((_uploadProgress ?? 0) * 100).round()}% uploaded'),
+        ],
         const SizedBox(height: 24),
         FilledButton(
-          onPressed: () {
+          onPressed: _publishing ? null : () async {
             if (_title.text.trim().isEmpty) return;
+            if (Firebase.apps.isNotEmpty && FirebaseAuth.instance.currentUser == null) {
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const AuthPage()));
+              return;
+            }
+            setState(() => _publishing = true);
+            final user = Firebase.apps.isEmpty ? null : FirebaseAuth.instance.currentUser;
+            if (user != null) {
+              final ref = await FirestoreStoryRepository().createStory(
+                creatorId: user.uid,
+                title: _title.text.trim(),
+                description: _description.text.trim().isEmpty ? 'A new Kindred story.' : _description.text.trim(),
+                storyType: _type.toLowerCase(),
+                evidenceType: _evidence.toLowerCase().replaceAll(' ', '_'),
+                visibility: _visibility.toLowerCase(),
+              );
+              final storyId = ref.id;
+              final evidence = EvidenceRepository();
+              for (final file in _files) {
+                await evidence.uploadEvidence(storyId: storyId, uploadedBy: user.uid, file: file, kind: _kindFor(file), onProgress: (progress) => setState(() => _uploadProgress = progress.fraction));
+              }
+            }
             widget.onCreated(
               Story(
                 title: _title.text.trim(),
@@ -701,17 +767,27 @@ class _StoryFormState extends State<StoryForm> {
                 evidence: _evidence,
                 date: 'Today',
                 location: 'Add a place',
-                creator: 'Maya Chen',
+                creator: 'Story Keeper',
                 visibility: _visibility,
               ),
             );
+            if (mounted) setState(() => _publishing = false);
             Navigator.pop(context);
           },
-          child: const Text('Publish story'),
+          child: Text(_publishing ? 'Publishing…' : 'Publish story'),
         ),
       ],
     ),
   );
+
+  String _kindFor(PlatformFile file) {
+    final extension = (file.extension ?? '').toLowerCase();
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].contains(extension)) return 'photograph';
+    if (['mp3', 'wav', 'm4a', 'aac'].contains(extension)) return 'audio';
+    if (['mp4', 'mov', 'webm'].contains(extension)) return 'video';
+    if (extension == 'pdf' || extension == 'doc' || extension == 'docx') return 'document';
+    return 'other';
+  }
 }
 
 class RecordingDialog extends StatefulWidget {
@@ -815,6 +891,25 @@ class ProfilePage extends StatelessWidget {
           subtitle: Text('Student storyteller'),
         ),
       ),
+      const SizedBox(height: 12),
+      StreamBuilder<User?>(
+        stream: Firebase.apps.isEmpty ? const Stream<User?>.empty() : AuthRepository().watchAuthState(),
+        builder: (context, snapshot) {
+          final user = snapshot.data;
+          if (user == null) {
+            return FilledButton.icon(
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AuthPage())),
+              icon: const Icon(Icons.login),
+              label: const Text('Sign in or create account'),
+            );
+          }
+          return OutlinedButton.icon(
+            onPressed: () => AuthRepository().signOut(),
+            icon: const Icon(Icons.logout),
+            label: Text('Sign out ${user.email ?? ''}'),
+          );
+        },
+      ),
       const SizedBox(height: 20),
       Text(
         'Appearance',
@@ -851,5 +946,65 @@ class ProfilePage extends StatelessWidget {
         trailing: Icon(Icons.chevron_right),
       ),
     ],
+  );
+}
+
+class AuthPage extends StatefulWidget {
+  const AuthPage({super.key});
+
+  @override
+  State<AuthPage> createState() => _AuthPageState();
+}
+
+class _AuthPageState extends State<AuthPage> {
+  final _email = TextEditingController();
+  final _password = TextEditingController();
+  bool _register = false;
+  bool _busy = false;
+  String? _error;
+
+  Future<void> _submit() async {
+    setState(() { _busy = true; _error = null; });
+    try {
+      final auth = AuthRepository();
+      if (_register) {
+        await auth.register(email: _email.text.trim(), password: _password.text);
+      } else {
+        await auth.signIn(email: _email.text.trim(), password: _password.text);
+      }
+      if (mounted) Navigator.pop(context);
+    } on FirebaseAuthException catch (error) {
+      setState(() => _error = error.message ?? error.code);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _resetPassword() async {
+    if (_email.text.trim().isEmpty) {
+      setState(() => _error = 'Enter your email first.');
+      return;
+    }
+    try {
+      await AuthRepository().sendPasswordReset(_email.text.trim());
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password reset email sent.')));
+    } on FirebaseAuthException catch (error) {
+      setState(() => _error = error.message ?? error.code);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: Text(_register ? 'Create account' : 'Sign in')),
+    body: ListView(padding: const EdgeInsets.all(20), children: [
+      TextField(controller: _email, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'Email', border: OutlineInputBorder())),
+      const SizedBox(height: 14),
+      TextField(controller: _password, obscureText: true, decoration: const InputDecoration(labelText: 'Password', border: OutlineInputBorder())),
+      if (_error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error))),
+      const SizedBox(height: 20),
+      FilledButton(onPressed: _busy ? null : _submit, child: Text(_busy ? 'Please wait…' : (_register ? 'Create account' : 'Sign in'))),
+      if (!_register) TextButton(onPressed: _busy ? null : _resetPassword, child: const Text('Forgot password?')),
+      TextButton(onPressed: _busy ? null : () => setState(() => _register = !_register), child: Text(_register ? 'Already have an account? Sign in' : 'New to Kindred? Create an account')),
+    ]),
   );
 }

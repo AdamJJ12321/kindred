@@ -4,12 +4,26 @@ service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
 
+    function ownsStory() { return signedIn() && resource.data.creatorId == request.auth.uid; }
+    function canReadStory() {
+      return resource.data.status == 'published' && (
+        resource.data.visibility == 'public' ||
+        ownsStory() ||
+        (signedIn() && resource.data.visibility == 'invited' && resource.data.allowedUserIds.hasAny([request.auth.uid])) ||
+        (signedIn() && resource.data.visibility == 'family' && resource.data.familyMemberIds.hasAny([request.auth.uid]))
+      );
+    }
+
     match /stories/{storyId} {
-      allow read: if resource.data.status == 'published'
-        && (resource.data.visibility == 'public'
-          || (signedIn() && resource.data.creatorId == request.auth.uid));
+      allow read: if canReadStory();
       allow create: if signedIn() && request.resource.data.creatorId == request.auth.uid;
-      allow update, delete: if signedIn() && resource.data.creatorId == request.auth.uid;
+      allow update, delete: if ownsStory();
+
+      match /evidence/{evidenceId} {
+        allow read: if canReadStory();
+        allow create: if ownsStory() && request.resource.data.uploadedBy == request.auth.uid;
+        allow update, delete: if ownsStory();
+      }
     }
 
     match /users/{userId} {
@@ -29,6 +43,12 @@ service cloud.firestore {
     match /dailyQuestions/{questionId} {
       allow read: if true;
       allow write: if false;
+    }
+
+    match /timelineEvents/{eventId} {
+      allow read: if true;
+      allow create: if signedIn() && request.resource.data.createdBy == request.auth.uid;
+      allow update, delete: if signedIn() && resource.data.createdBy == request.auth.uid;
     }
 
     match /{document=**} { allow read, write: if false; }
