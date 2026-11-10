@@ -1,6 +1,6 @@
 # Kindred iterative product and technical plan
 
-Kindred is a Flutter mobile app backed by Firebase where people preserve and explore oral, family, cultural, local, and personal histories. Each story can include media, evidence classification, dates, locations, and relationships to other stories. Users discover history spatially through an interactive map, chronologically through an interactive timeline, or personally through family collections.
+Kindred is a Flutter mobile app where people preserve and explore oral, family, cultural, local, and personal histories. Pre-MVP slices use mock data and local repositories to complete the product workflows; Firebase becomes the production backend during MVP hardening. Each story can include media, evidence classification, dates, locations, and relationships to other stories. Users discover history spatially through an interactive map, chronologically through an interactive timeline, or personally through family collections.
 
 ## Product principles
 
@@ -29,7 +29,7 @@ Organize the app by feature rather than by screen:
 - `daily_questions`: prompts and answers.
 - `processing`: transcription, summaries, translation, and job status.
 
-Use repository interfaces between UI and data services. Alpha repositories use mock data; Beta repositories use Firebase without requiring a rewrite of the screens.
+Use repository interfaces between UI and data services. Every slice before MVP uses mock repositories and local persistence only, so the product can complete its workflows and UI without a backend dependency. The MVP stage will replace those interfaces with Firebase/Firestore adapters without requiring a rewrite of the screens.
 
 ### Visual theme
 
@@ -37,11 +37,11 @@ Use a restrained, familiar default light theme with standard Flutter/Material co
 
 Use the supplied Pastport reference as visual direction rather than a literal screen specification: warm paper-like neutrals, deep teal recording and navigation surfaces, restrained terracotta and gold accents, editorial display typography paired with readable sans-serif body text, rounded cards, and prominent photographic evidence. Keep controls familiar and accessible; texture, badges, and map styling remain secondary to story readability.
 
-### Firebase backend
+### Firebase backend (MVP integration)
 
-- Firebase Authentication for accounts and sign-in.
-- Cloud Firestore for users, stories, events, family collections, questions, and permissions.
-- Firestore evidence metadata; binary media storage remains deferred until a storage provider is available.
+- Firebase Authentication for accounts and sign-in, introduced during MVP hardening.
+- Cloud Firestore for users, stories, events, family collections, questions, and permissions, introduced during MVP hardening.
+- Firebase Storage for binary evidence, introduced during MVP hardening after the mock workflows are complete.
 - Cloud Functions for media processing, transcription orchestration, metadata extraction, daily-question scheduling, notifications, and moderation hooks.
 - Firebase App Check, Security Rules, and audit logging for access control.
 - Firebase Analytics and Crashlytics for usage and reliability.
@@ -63,7 +63,7 @@ Each story should support:
 
 ### Slice 0: Product and technical preparation
 
-Define the visual language, information architecture, permission model, and Firebase schema before feature implementation.
+Define the visual language, information architecture, permission model, mock schemas, and repository interfaces before feature implementation. Do not require Firebase integration in this slice.
 
 Deliverables:
 
@@ -107,32 +107,32 @@ Alpha acceptance criteria:
 - Widget and golden tests cover primary navigation and story creation.
 - The map, record action, and story evidence are visually prominent in the default Explore experience.
 
-### Beta: Firebase connection and persistence
+### Beta: complete mock functionality
 
-Replace mock repositories with Firebase while preserving the Alpha UI.
+Complete the product workflows with deterministic mock repositories and local test state while preserving the Alpha UI. Firebase integration is intentionally deferred until MVP hardening.
 
 Implement:
 
-- Firebase Authentication.
-- Firestore repositories for users, stories, families, questions, and timeline events.
-- Firestore-only evidence metadata; binary media upload is deferred.
-- Security Rules for private, family-only, invited, and public content.
-- Real-time story and collection updates.
-- Development seed data and Firebase Emulator Suite support.
+- Mock authentication and profile state.
+- Mock repositories for users, stories, families, questions, timeline events, and evidence.
+- Mock media selection, upload progress, retry, and failure states without binary backend storage.
+- Mock enforcement for private, family-only, invited, and public content.
+- Deterministic realtime-like story and collection updates for UI testing.
+- Local seed fixtures and repeatable reset flows.
 - Environment configuration for development, staging, and production.
 
 Beta acceptance criteria:
 
-- A user can register, sign in, sign out, and recover access.
-- Stories persist across sessions and devices.
-- Evidence metadata is stored in Firestore and associated with the correct story; binary media upload is deferred.
-- Unauthorized users cannot read private or family-only content.
-- Map and timeline render Firestore data.
-- Automated Rules tests cover ownership, family roles, invitations, and public access.
+- A user can complete register, sign in, sign out, and recovery flows against mock state.
+- Stories, drafts, evidence, families, questions, and timeline events persist in the mock/local test layer.
+- Mock media workflows cover selection, progress, retry, cancellation, and failure states.
+- Mock authorization prevents private or family-only content from appearing to unauthorized users.
+- Map and timeline render fixture data and update when fixture state changes.
+- Automated tests cover ownership, family roles, invitations, public access, and all primary state transitions.
 
 ### Slice 1: Real story creation and evidence
 
-Replace mocked creation with a complete evidence workflow:
+Build a complete evidence workflow using mock repositories and local fixture data:
 
 - Story metadata form and draft saving.
 - Multi-file upload for photographs and documents.
@@ -213,16 +213,16 @@ Add AI after evidence, permissions, and review workflows are stable:
 
 AI-generated text must remain distinguishable from the original account and editable by the user.
 
-## MVP scope
+## MVP scope and backend integration
 
-The MVP is the full feature set: authenticated accounts, story creation, photographs, recordings, documents, evidence classification, Firebase persistence and security, map, timeline, public family groups with per-story privacy, daily questions, optional Quest Board prompts, a moderated Community feed for public stories, transcription, summaries, translation, search, filtering, sharing, deletion, privacy controls, accessibility support, analytics, crash reporting, and comprehensive testing. Collection metrics and badges remain lightweight contribution summaries rather than competitive rankings.
+The MVP is the full feature set: authenticated accounts, story creation, photographs, recordings, documents, evidence classification, Firebase Auth/Firestore/Storage persistence and Security Rules, map, timeline, public family groups with per-story privacy, daily questions, optional Quest Board prompts, a moderated Community feed for public stories, transcription, summaries, translation, search, filtering, sharing, deletion, privacy controls, accessibility support, analytics, crash reporting, and comprehensive testing. Firestore integration happens here, after all prior slices have complete mock-data functionality. Collection metrics and badges remain lightweight contribution summaries rather than competitive rankings.
 
 ## Testing strategy
 
 - Flutter unit tests for models, repositories, validation, upload queues, and state transitions.
 - Widget and golden tests for every primary user flow.
-- Integration tests using the Firebase Emulator Suite.
-- Firebase Security Rules tests for ownership, family roles, invitations, and public access.
+- Unit, widget, and integration tests against mock repositories for every pre-MVP slice.
+- Firebase integration, emulator, and Security Rules tests during MVP hardening for ownership, family roles, invitations, and public access.
 - Media tests for permissions, interrupted recording, large uploads, retries, and offline recovery.
 - Map and timeline tests for date ranges, approximate locations, clustering, filters, and privacy.
 - AI evaluation tests for transcript fidelity, translation quality, names, dates, accents, code-switching, and hallucination avoidance.
@@ -234,19 +234,19 @@ The MVP is the full feature set: authenticated accounts, story creation, photogr
 
 1. Product foundation and data contracts.
 2. Alpha: mock-data app with complete navigation and visual design.
-3. Beta: Firebase authentication, Firestore database, and Security Rules.
-4. Real story and evidence creation.
-5. Recording and upload workflow.
-6. Map and timeline experiences.
-7. Family histories and sharing.
-8. Daily questions.
-9. AI enrichment and advanced search.
-10. MVP hardening, privacy review, accessibility, performance testing, and pilot release.
+3. Beta: complete mock-data workflows, repository contracts, local persistence, and state/error coverage.
+4. Real story and evidence creation using mock data.
+5. Recording and upload workflow using mock media services.
+6. Map and timeline experiences using mock repositories.
+7. Family histories and sharing using mock repositories.
+8. Daily questions using mock repositories.
+9. AI enrichment and advanced search using mock processing results.
+10. MVP hardening: integrate Firebase Auth/Firestore/Storage, migrate repositories, add Security Rules, then complete privacy review, accessibility, performance testing, and pilot release.
 
 ## Assumptions and defaults
 
 - Flutter targets iOS and Android first.
-- Firebase is the required backend; Firebase Emulator Suite is used during development.
+- Firebase is the required MVP backend; all pre-MVP slices use mock repositories and local fixtures.
 - Stories are public by default; authors can choose private, family-only, or invited visibility before posting or change it later.
 - Family groups are automatically public and cannot be made private; stories within them retain independent visibility.
 - The app supports approximate dates and locations for uncertain or sensitive histories.
