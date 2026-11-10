@@ -1,34 +1,83 @@
 # Next work brief — Kindred Slice 1 Part B
 
-Kindred is a Flutter mobile app backed by Firebase where people preserve and explore oral, family, cultural, local, and personal histories. Stories can include media, evidence classification, dates, locations, and relationships to other stories. People discover history spatially through a map, chronologically through a timeline, or personally through family collections. The product favors complementary oral and documented history, visible provenance, original evidence beside generated text, public-by-default stories with author privacy control, public family groups with per-story privacy, and gentle progress without ranking sensitivity or popularity.
+## Product context
 
-## Current status
+Kindred is a Flutter app for preserving and exploring oral, family, cultural, local, and personal histories. Stories support provenance, evidence, dates, locations, family relationships, and privacy. Preserve the Pastport-inspired parchment, teal, terracotta/gold, editorial/sans visual direction and full dark mode.
 
-Beta 5–7 is complete in this repository: Firestore Rules and automated Rules tests, realtime snapshot streams, and checked-in seed data. Existing code includes Firebase Auth UX, repositories for stories/users/families/daily questions/timeline, Firebase Storage photo/document evidence, Explore and Families live surfaces, dark mode, and the Pastport-inspired UI. The Firebase Emulator Suite has been removed from the project configuration; local/staging work uses an isolated Firebase project.
+## Current repository state
 
-## Next scope: Slice 1 Part B only
+The Flutter and Git repository root is `/Users/ying/Desktop/kindred/app`. Existing functionality includes Firebase Auth, user/story/family/question/timeline repositories, realtime Firestore listeners, story drafts/publishing, public/private/family/invited visibility, Firebase Storage photo/document uploads, Firestore evidence metadata, Firestore/Storage Rules, automated Rules tests, and existing widget tests.
 
-Continue the real story creation and evidence workflow. Part A now covers draft/publish, photo/document Storage uploads, source notes, and owner ACLs. Do not implement Slice 2–6 features, AI, recording intelligence, or a broad visual redesign.
+The Firebase Emulator Suite has been removed from project configuration. Do not add emulator setup back. Use repository interfaces and mock/local fixtures for new pre-MVP behavior where practical. Firebase integration is planned for MVP hardening in `PLAN.md`.
+
+Read before coding:
+
+```text
+PLAN.md
+README.md
+docs/slice-0/data-contracts.md
+docs/slice-0/privacy-and-access.md
+docs/slice-0/environments.md
+docs/slice-0/navigation.md
+docs/slice-0/quality-requirements.md
+lib/data/*
+lib/main.dart
+firestore.rules
+storage.rules
+firebase.json
+rules-tests/
+seed-data.json
+```
+
+## Scope — Part B only
+
+Complete the remaining Slice 1 story/evidence workflow. Do not implement Slice 2–6, recording intelligence, speech recognition, AI, translation, summaries, notifications, or a broad UI redesign.
 
 Deliver:
 
-- Story drafts and publishing flow.
-- Multi-file photo/document upload plus audio/video attachments through Firebase Storage.
-- Evidence classification and source notes.
-- Approximate dates and multiple locations.
-- Evidence preview, ordering, editing, and deletion.
-- Creator attribution and edit history/original content preservation.
+- Approximate, exact, and range dates with visible date confidence; never invent precision.
+- Multiple story/evidence locations with labels, coordinates, and precision for sensitive locations.
+- Evidence previews showing filename, type, MIME type, caption, and source note.
+- Evidence metadata editing and deletion, including associated Storage cleanup for the owner.
+- Stable evidence ordering and reordering.
+- Failed-upload, retry, offline, missing-media, and permission-error states.
+- Reopen/edit existing drafts or owned stories while preserving creator attribution.
+- Smallest contract-aligned edit-history/original-content support; no generalized audit platform.
 
-Preserve the Pastport theme and dark mode, keep the repository pattern and feature boundaries, default new stories to public, and keep family groups public with privacy controlled per story. Storage was deferred in Beta; Slice 1 is the point where real media upload and story/evidence association lands. Do not add AI yet.
+## Constraints
 
-## Acceptance and testing
+- Preserve Pastport UI, dark mode, Auth, realtime behavior, and repository patterns.
+- Preserve public-default stories, public family groups, per-story privacy, invited access, and deny-by-default Rules.
+- Do not restore the Firebase Emulator Suite.
+- Do not add production secrets, service-account credentials, or generated dependency directories.
+- Commit only if explicitly requested.
 
-Verify authenticated users can save drafts, publish stories, attach and manage multiple evidence items, see attribution/edit history, and preserve metadata after reload. Verify public/private/family/invited Rules behavior, owner-only edits/deletes, Storage authorization, offline/error states, and live updates from a second client. Add repository/widget tests, Rules tests against a separately managed Firebase test project, upload metadata tests, and a manual device test for large files, interrupted uploads, retry, ordering, and deletion. Run `flutter analyze`, `flutter test`, and Rules tests before release.
+## Acceptance checks
 
-## Next-session agent prompt
+- Drafts can be created, edited, reloaded, and published without losing metadata.
+- Stories can contain multiple locations and ordered evidence items.
+- Owners can preview, edit, reorder, retry, and delete evidence; unauthorized users cannot.
+- Storage and Firestore permissions match the privacy contract.
+- Public stories/families remain readable while private/family/invited access remains restricted.
+- Live story/family surfaces still update from repository streams.
+- Light/dark mode, text scaling, loading, empty, offline, and permission-error states remain usable.
+
+## Verification
+
+From `/Users/ying/Desktop/kindred/app`:
+
+```bash
+flutter pub get
+flutter analyze
+flutter test
+```
+
+Run Rules tests only against the separately managed Firebase test environment; do not add local emulator configuration. Manually test with two authenticated users: draft/publish, public/private/family/invited access, multiple locations, evidence order/edit/delete, failed upload/retry, and dark mode.
+
+## Copy-pasteable next-session prompt
 
 ```text
-Work in /Users/ying/Desktop/kindred/app. Read prompt.md, README.md, PLAN.md if present, firestore.rules, firebase.json, lib/data, lib/main.dart, and rules-tests before changing code.
+Work in /Users/ying/Desktop/kindred/app. Read prompt.md, PLAN.md, README.md, the Slice 0 contract/privacy/environment/navigation/quality docs, lib/data/*, lib/main.dart, firestore.rules, storage.rules, firebase.json, seed-data.json, and rules-tests/ before editing.
 
-Implement Slice 1 only: real story drafts/publishing and evidence workflow with Firebase Storage media association. Add multi-file photo/document upload, audio/video attachments, evidence classification/source notes, approximate dates, multiple locations, evidence preview/order/edit/delete, creator attribution, and edit history/original content preservation. Preserve the Pastport-inspired UI and dark mode, repository patterns, public-default visibility, public family groups with per-story privacy, and existing Auth/realtime behavior. Do not implement Slice 2–6, AI, speech recognition, or a large redesign. Update Rules/tests and documentation, use a separately managed Firebase test project for verification, and report exact files changed and test results. Commit only if explicitly requested.
+Implement Kindred Slice 1 Part B only: approximate/exact/range date confidence, multiple locations with precision, evidence previews, stable evidence ordering/reordering, evidence metadata edit/delete, associated Storage cleanup, retry/offline/permission-error states, draft/story editing, creator attribution, and the smallest contract-aligned edit-history/original-content support. Preserve the Pastport-inspired UI, dark mode, Auth, realtime behavior, repository interfaces, public-default visibility, public family groups with per-story privacy, and deny-by-default Rules. Do not implement Slice 2–6, recording, microphone capture, speech recognition, AI, translation, summaries, notifications, broad redesign, or the Firebase Emulator Suite. Use mock/local fixtures for new pre-MVP behavior where practical, update contracts/Rules/tests together, run flutter analyze and flutter test, and report files changed, commands/results, manual tests, and known gaps. Commit only if explicitly requested.
 ```

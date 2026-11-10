@@ -28,6 +28,7 @@ visibility: public | private | family | invited
 status: draft | published | archived | deleted
 date?: { kind: exact | approximate | range, start: timestamp, end?: timestamp }
 location?: { label: string, latitude: number, longitude: number, precision: exact | neighborhood | city | region }
+locations?: { label: string, latitude: number, longitude: number, precision: exact | neighborhood | city | region }[]
 familyIds: string[]
 relatedStoryIds: string[]
 createdAt: timestamp

@@ -32,7 +32,8 @@ service cloud.firestore {
       match /evidence/{evidenceId} {
         allow read: if storyIsReadable(get(/databases/$(database)/documents/stories/$(storyId)));
         allow create: if ownsParentStory(storyId) && request.resource.data.uploadedBy == request.auth.uid;
-        allow update, delete: if ownsParentStory(storyId) && request.resource.data.uploadedBy == resource.data.uploadedBy;
+        allow update: if ownsParentStory(storyId) && request.resource.data.uploadedBy == resource.data.uploadedBy;
+        allow delete: if ownsParentStory(storyId);
       }
     }
 

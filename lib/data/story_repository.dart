@@ -27,6 +27,8 @@ class FirestoreStoryRepository {
     String visibility = 'public',
     String status = 'published',
     String sourceNotes = '',
+    Map<String, dynamic>? date,
+    List<Map<String, dynamic>> locations = const [],
   }) {
     final now = FieldValue.serverTimestamp();
     return _firestore.collection('stories').add({
@@ -42,6 +44,8 @@ class FirestoreStoryRepository {
       'createdAt': now,
       'updatedAt': now,
       'sourceNotes': sourceNotes,
+      if (date != null) 'date': date,
+      'locations': locations,
       if (status == 'published') 'publishedAt': now,
     });
   }
@@ -74,8 +78,10 @@ class FirestoreStoryRepository {
     String? sourceNote,
     String? storagePath,
     String? mimeType,
+    int order = 0,
   }) {
     final data = <String, dynamic>{'kind': kind, 'uploadedBy': uploadedBy};
+    data['order'] = order;
     if (fileName?.trim().isNotEmpty == true)
       data['fileName'] = fileName!.trim();
     if (caption?.trim().isNotEmpty == true) data['caption'] = caption!.trim();
@@ -101,6 +107,7 @@ class FirestoreStoryRepository {
     String? mimeType,
     String? caption,
     String? sourceNote,
+    int order = 0,
   }) async {
     final path =
         'stories/$storyId/evidence/${DateTime.now().microsecondsSinceEpoch}_$fileName';
@@ -119,7 +126,52 @@ class FirestoreStoryRepository {
       sourceNote: sourceNote,
       storagePath: path,
       mimeType: mimeType,
+      order: order,
     );
+  }
+
+  Future<void> updateEvidence(
+    String storyId,
+    String evidenceId,
+    Map<String, dynamic> data,
+  ) {
+    return _firestore
+        .collection('stories')
+        .doc(storyId)
+        .collection('evidence')
+        .doc(evidenceId)
+        .update(data);
+  }
+
+  Future<void> deleteEvidence(
+    String storyId,
+    String evidenceId, {
+    String? storagePath,
+  }) async {
+    if (storagePath?.isNotEmpty == true) {
+      await FirebaseStorage.instance.ref(storagePath).delete();
+    }
+    await _firestore
+        .collection('stories')
+        .doc(storyId)
+        .collection('evidence')
+        .doc(evidenceId)
+        .delete();
+  }
+
+  Future<void> reorderEvidence(String storyId, List<String> evidenceIds) async {
+    final batch = _firestore.batch();
+    for (var i = 0; i < evidenceIds.length; i++) {
+      batch.update(
+        _firestore
+            .collection('stories')
+            .doc(storyId)
+            .collection('evidence')
+            .doc(evidenceIds[i]),
+        {'order': i},
+      );
+    }
+    await batch.commit();
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> watchEvidence(String storyId) =>
@@ -127,5 +179,6 @@ class FirestoreStoryRepository {
           .collection('stories')
           .doc(storyId)
           .collection('evidence')
+          .orderBy('order')
           .snapshots();
 }

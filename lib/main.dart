@@ -118,6 +118,7 @@ class Story {
     required this.location,
     required this.creator,
     required this.visibility,
+    this.storyId,
     this.isRecording = false,
   });
 
@@ -129,6 +130,7 @@ class Story {
   final String location;
   final String creator;
   final String visibility;
+  final String? storyId;
   final bool isRecording;
 }
 
@@ -439,6 +441,7 @@ class LiveStoryFeed extends StatelessWidget {
               .map((doc) {
                 final data = doc.data();
                 final story = Story(
+                  storyId: doc.id,
                   title: data['title'] as String? ?? 'Untitled story',
                   description: data['description'] as String? ?? '',
                   type: data['storyType'] as String? ?? 'Personal',
@@ -688,6 +691,7 @@ class StoryDetail extends StatelessWidget {
           title: const Text('When'),
           subtitle: Text(story.date),
         ),
+        if (story.storyId != null) EvidenceLive(storyId: story.storyId!),
         ListTile(
           leading: const Icon(Icons.place_outlined),
           title: const Text('Where'),
@@ -714,6 +718,76 @@ class StoryDetail extends StatelessWidget {
       ],
     ),
   );
+}
+
+class EvidenceLive extends StatelessWidget {
+  const EvidenceLive({super.key, required this.storyId});
+  final String storyId;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirestoreStoryRepository().watchEvidence(storyId),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return const Card(
+            child: ListTile(
+              leading: Icon(Icons.lock_outline),
+              title: Text('Evidence unavailable'),
+              subtitle: Text(
+                'You may not have permission to view this evidence.',
+              ),
+            ),
+          );
+        }
+        if (!snapshot.hasData) {
+          return const Padding(
+            padding: EdgeInsets.all(16),
+            child: CircularProgressIndicator(),
+          );
+        }
+        if (snapshot.data!.docs.isEmpty) {
+          return const Card(
+            child: ListTile(title: Text('No evidence attached yet')),
+          );
+        }
+        final items = snapshot.data!.docs.map((doc) {
+          final data = doc.data();
+          final description = [
+            data['caption'],
+            data['sourceNote'],
+          ].whereType<String>().where((value) => value.isNotEmpty).join(' · ');
+          return ListTile(
+            leading: Icon(
+              data['kind'] == 'photograph'
+                  ? Icons.photo_outlined
+                  : Icons.description_outlined,
+            ),
+            title: Text(
+              data['fileName'] as String? ??
+                  data['kind'] as String? ??
+                  'Evidence',
+            ),
+            subtitle: description.isEmpty ? null : Text(description),
+          );
+        }).toList();
+        return Card(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const ListTile(
+                title: Text(
+                  'Evidence',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+              ...items,
+            ],
+          ),
+        );
+      },
+    );
+  }
 }
 
 class CreatePage extends StatelessWidget {
@@ -807,6 +881,14 @@ class _StoryFormState extends State<StoryForm> {
   String _visibility = 'Public';
   String _status = 'published';
   PlatformFile? _pickedFile;
+  String _dateKind = 'approximate';
+  final _dateStart = TextEditingController();
+  final _dateEnd = TextEditingController();
+  final _locationLabel = TextEditingController();
+  final _locationLatitude = TextEditingController();
+  final _locationLongitude = TextEditingController();
+  String _locationPrecision = 'city';
+  final List<Map<String, dynamic>> _locations = [];
   bool _publishing = false;
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -889,6 +971,118 @@ class _StoryFormState extends State<StoryForm> {
             DropdownMenuItem(value: 'published', child: Text('Publish now')),
           ],
           onChanged: (v) => setState(() => _status = v!),
+        ),
+        const SizedBox(height: 14),
+        DropdownButtonFormField<String>(
+          initialValue: _dateKind,
+          decoration: const InputDecoration(
+            labelText: 'Date confidence',
+            border: OutlineInputBorder(),
+          ),
+          items: const [
+            DropdownMenuItem(value: 'exact', child: Text('Exact date')),
+            DropdownMenuItem(
+              value: 'approximate',
+              child: Text('Approximate date'),
+            ),
+            DropdownMenuItem(value: 'range', child: Text('Date range')),
+          ],
+          onChanged: (v) => setState(() => _dateKind = v!),
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _dateStart,
+          decoration: const InputDecoration(
+            labelText: 'Date or year',
+            hintText: 'e.g. 1968-06-12',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        if (_dateKind == 'range') ...[
+          const SizedBox(height: 10),
+          TextField(
+            controller: _dateEnd,
+            decoration: const InputDecoration(
+              labelText: 'End date or year',
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ],
+        const SizedBox(height: 14),
+        TextField(
+          controller: _locationLabel,
+          decoration: const InputDecoration(
+            labelText: 'Location label',
+            hintText: 'e.g. Oakland Chinatown',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 10),
+        DropdownButtonFormField<String>(
+          initialValue: _locationPrecision,
+          decoration: const InputDecoration(
+            labelText: 'Location precision',
+            border: OutlineInputBorder(),
+          ),
+          items: const [
+            DropdownMenuItem(value: 'exact', child: Text('Exact')),
+            DropdownMenuItem(
+              value: 'neighborhood',
+              child: Text('Neighborhood'),
+            ),
+            DropdownMenuItem(value: 'city', child: Text('City')),
+            DropdownMenuItem(value: 'region', child: Text('Region')),
+          ],
+          onChanged: (v) => setState(() => _locationPrecision = v!),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _locationLatitude,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(
+                  labelText: 'Latitude',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextField(
+                controller: _locationLongitude,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(
+                  labelText: 'Longitude',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: () {
+            if (_locationLabel.text.trim().isEmpty) return;
+            setState(() {
+              _locations.add({
+                'label': _locationLabel.text.trim(),
+                'latitude': double.tryParse(_locationLatitude.text.trim()),
+                'longitude': double.tryParse(_locationLongitude.text.trim()),
+                'precision': _locationPrecision,
+              });
+              _locationLabel.clear();
+              _locationLatitude.clear();
+              _locationLongitude.clear();
+            });
+          },
+          icon: const Icon(Icons.add_location_alt_outlined),
+          label: Text('Add location (${_locations.length})'),
         ),
         const SizedBox(height: 18),
         OutlinedButton.icon(
@@ -998,6 +1192,16 @@ class _StoryFormState extends State<StoryForm> {
                           visibility: _visibility.toLowerCase(),
                           status: _status,
                           sourceNotes: _evidenceSource.text,
+                          date: _dateStart.text.trim().isEmpty
+                              ? null
+                              : {
+                                  'kind': _dateKind,
+                                  'start': _dateStart.text.trim(),
+                                  if (_dateKind == 'range' &&
+                                      _dateEnd.text.trim().isNotEmpty)
+                                    'end': _dateEnd.text.trim(),
+                                },
+                          locations: _locations,
                         );
                     if (_pickedFile?.bytes != null) {
                       final extension = _pickedFile!.extension?.toLowerCase();
@@ -1018,9 +1222,10 @@ class _StoryFormState extends State<StoryForm> {
                         sourceNote: _evidenceSource.text,
                       );
                     }
-                    if (_evidenceFile.text.trim().isNotEmpty ||
-                        _evidenceCaption.text.trim().isNotEmpty ||
-                        _evidenceSource.text.trim().isNotEmpty) {
+                    if (_pickedFile == null &&
+                        (_evidenceFile.text.trim().isNotEmpty ||
+                            _evidenceCaption.text.trim().isNotEmpty ||
+                            _evidenceSource.text.trim().isNotEmpty)) {
                       await FirestoreStoryRepository().addEvidence(
                         storyId: storyId.id,
                         uploadedBy: user.uid,
