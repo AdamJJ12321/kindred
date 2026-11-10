@@ -4,7 +4,7 @@
 
 | Environment | Purpose | Data policy |
 | --- | --- | --- |
-| Local | Flutter development and automated tests | Firebase Emulator Suite only; disposable seed data |
+| Local | Flutter development and automated tests | Dedicated Firebase project with synthetic data only |
 | Staging | QA, device testing, and pilot rehearsal | Isolated Firebase project; synthetic or consented test data only |
 | Production | Real users and stories | Restricted access, backups, monitoring, and reviewed deployments |
 
@@ -12,7 +12,7 @@ The Flutter app selects an environment through build configuration. No productio
 
 ## Local development
 
-Use the Firebase Emulator Suite for Authentication and Firestore. Seed the emulators from `seed-data.json` and reset them between automated test runs.
+Use a dedicated non-production Firebase project for local development and synthetic data. Never use production credentials or real user data for local testing.
 
 ## Required configuration
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:file_picker/file_picker.dart';
 
 import 'data/auth_repository.dart';
 import 'data/story_repository.dart';
@@ -14,10 +15,6 @@ import 'firebase_options.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  if (const bool.fromEnvironment('USE_FIREBASE_EMULATORS')) {
-    await FirebaseAuth.instance.useAuthEmulator('127.0.0.1', 9099);
-    FirebaseFirestore.instance.useFirestoreEmulator('127.0.0.1', 8080);
-  }
   runApp(const KindredApp());
 }
 
@@ -808,6 +805,8 @@ class _StoryFormState extends State<StoryForm> {
   String _type = 'Family';
   String _evidence = 'Oral account';
   String _visibility = 'Public';
+  String _status = 'published';
+  PlatformFile? _pickedFile;
   bool _publishing = false;
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -878,6 +877,19 @@ class _StoryFormState extends State<StoryForm> {
           ].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
           onChanged: (v) => setState(() => _visibility = v!),
         ),
+        const SizedBox(height: 14),
+        DropdownButtonFormField<String>(
+          initialValue: _status,
+          decoration: const InputDecoration(
+            labelText: 'Save state',
+            border: OutlineInputBorder(),
+          ),
+          items: const [
+            DropdownMenuItem(value: 'draft', child: Text('Save as draft')),
+            DropdownMenuItem(value: 'published', child: Text('Publish now')),
+          ],
+          onChanged: (v) => setState(() => _status = v!),
+        ),
         const SizedBox(height: 18),
         OutlinedButton.icon(
           onPressed: () => showModalBottomSheet<void>(
@@ -893,7 +905,7 @@ class _StoryFormState extends State<StoryForm> {
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'Binary photos, documents, audio, and video are deferred.',
+                    'Attach one photo or document now. Audio and video remain deferred.',
                   ),
                   TextField(
                     controller: _evidenceFile,
@@ -917,6 +929,33 @@ class _StoryFormState extends State<StoryForm> {
                   FilledButton(
                     onPressed: () => Navigator.pop(context),
                     child: const Text('Done'),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      final result = await FilePicker.platform.pickFiles(
+                        withData: true,
+                        type: FileType.custom,
+                        allowedExtensions: [
+                          'jpg',
+                          'jpeg',
+                          'png',
+                          'pdf',
+                          'doc',
+                          'docx',
+                        ],
+                      );
+                      if (result != null &&
+                          result.files.single.bytes != null &&
+                          mounted)
+                        setState(() => _pickedFile = result.files.single);
+                    },
+                    icon: const Icon(Icons.upload_file),
+                    label: Text(
+                      _pickedFile == null
+                          ? 'Choose photo or document'
+                          : _pickedFile!.name,
+                    ),
                   ),
                 ],
               ),
@@ -957,7 +996,28 @@ class _StoryFormState extends State<StoryForm> {
                             '_',
                           ),
                           visibility: _visibility.toLowerCase(),
+                          status: _status,
+                          sourceNotes: _evidenceSource.text,
                         );
+                    if (_pickedFile?.bytes != null) {
+                      final extension = _pickedFile!.extension?.toLowerCase();
+                      final isDocument = [
+                        'pdf',
+                        'doc',
+                        'docx',
+                      ].contains(extension);
+                      await FirestoreStoryRepository().uploadEvidence(
+                        storyId: storyId.id,
+                        uploadedBy: user.uid,
+                        kind: isDocument ? 'document' : 'photograph',
+                        fileName: _pickedFile!.name,
+                        bytes: _pickedFile!.bytes!,
+                        mimeType: isDocument
+                            ? 'application/octet-stream'
+                            : 'image/${extension == 'jpg' ? 'jpeg' : extension}',
+                        sourceNote: _evidenceSource.text,
+                      );
+                    }
                     if (_evidenceFile.text.trim().isNotEmpty ||
                         _evidenceCaption.text.trim().isNotEmpty ||
                         _evidenceSource.text.trim().isNotEmpty) {
@@ -990,7 +1050,13 @@ class _StoryFormState extends State<StoryForm> {
                   setState(() => _publishing = false);
                   navigator.pop();
                 },
-          child: Text(_publishing ? 'Publishing…' : 'Publish story'),
+          child: Text(
+            _publishing
+                ? 'Saving…'
+                : _status == 'draft'
+                ? 'Save draft'
+                : 'Publish story',
+          ),
         ),
       ],
     ),

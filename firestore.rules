@@ -5,6 +5,7 @@ service cloud.firestore {
     function signedIn() { return request.auth != null; }
 
     function ownsStory() { return signedIn() && resource.data.creatorId == request.auth.uid; }
+    function ownsParentStory(storyId) { return signedIn() && get(/databases/$(database)/documents/stories/$(storyId)).data.creatorId == request.auth.uid; }
     function storyIsReadable(story) {
       return (signedIn() && story.data.creatorId == request.auth.uid) ||
         (story.data.status == 'published' && (
@@ -25,12 +26,13 @@ service cloud.firestore {
     match /stories/{storyId} {
       allow read: if canReadStory();
       allow create: if signedIn() && request.resource.data.creatorId == request.auth.uid;
-      allow update, delete: if ownsStory();
+      allow update: if ownsStory() && request.resource.data.creatorId == resource.data.creatorId;
+      allow delete: if ownsStory();
 
       match /evidence/{evidenceId} {
         allow read: if storyIsReadable(get(/databases/$(database)/documents/stories/$(storyId)));
-        allow create: if ownsStory() && request.resource.data.uploadedBy == request.auth.uid;
-        allow update, delete: if ownsStory() && request.resource.data.uploadedBy == resource.data.uploadedBy;
+        allow create: if ownsParentStory(storyId) && request.resource.data.uploadedBy == request.auth.uid;
+        allow update, delete: if ownsParentStory(storyId) && request.resource.data.uploadedBy == resource.data.uploadedBy;
       }
     }
 

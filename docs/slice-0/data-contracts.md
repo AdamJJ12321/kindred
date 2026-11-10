@@ -23,6 +23,7 @@ title: string
 description?: string
 storyType: oral | local | family | cultural | personal
 evidenceType: firsthand_memory | oral_account | documented_fact | unverified_story
+sourceNotes?: string
 visibility: public | private | family | invited
 status: draft | published | archived | deleted
 date?: { kind: exact | approximate | range, start: timestamp, end?: timestamp }
@@ -41,6 +42,8 @@ kind: photograph | audio | video | document | other
 fileName?: string
 caption?: string
 sourceNote?: string
+storagePath?: string # Firebase Storage path; binary data is never stored in Firestore
+mimeType?: string
 uploadedBy: string
 ```
 

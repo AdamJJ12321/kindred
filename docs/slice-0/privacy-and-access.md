@@ -32,6 +32,7 @@ Recording requires a clear confirmation from both the person operating the app a
 ## Security requirements
 
 - Enforce access with Firestore Security Rules; client-side hiding is not authorization.
+- Evidence metadata and Storage objects are readable and writable only through the parent story's creator or the parent story's allowed readers for reads; only the creator may create, update, or delete evidence.
 - Validate creator, family membership, visibility, and status on every read/write path.
 - Protect sensitive or approximate locations by storing the precision explicitly and rendering only the permitted precision.
 - Keep provider credentials and privileged processing operations in Cloud Functions, never in the Flutter client.
