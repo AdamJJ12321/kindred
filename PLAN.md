@@ -1,0 +1,253 @@
+# Kindred iterative product and technical plan
+
+Kindred is a Flutter mobile app backed by Firebase where people preserve and explore oral, family, cultural, local, and personal histories. Each story can include media, evidence classification, dates, locations, and relationships to other stories. Users discover history spatially through an interactive map, chronologically through an interactive timeline, or personally through family collections.
+
+## Product principles
+
+- Treat oral accounts and documented records as complementary forms of history.
+- Make provenance visible: every story identifies whether it is a firsthand memory, oral account, documented fact, or unverified story.
+- Preserve original evidence alongside generated or edited text.
+- Make stories public by default, with an author-controlled privacy choice before posting or afterward.
+- Make family groups automatically public; privacy is controlled per story inside the group.
+- Build in vertical slices so every milestone produces a usable experience.
+- Make discovery place-based and human: the map is the primary home for local stories, with timeline and feed as alternate paths.
+- Reward participation with gentle progress markers without ranking the sensitivity, truth, or popularity of someone’s history.
+
+## Shared technical foundation
+
+### Flutter application
+
+Organize the app by feature rather than by screen:
+
+- `core`: theme, routing, permissions, connectivity, local persistence, and error handling.
+- `auth`: accounts, profiles, and access state.
+- `stories`: story creation, editing, evidence, and discovery.
+- `recording`: microphone permissions, recording, playback, and deferred media state.
+- `map`: location-based exploration.
+- `timeline`: chronological exploration and event grouping.
+- `families`: public family-history collections with per-story privacy.
+- `daily_questions`: prompts and answers.
+- `processing`: transcription, summaries, translation, and job status.
+
+Use repository interfaces between UI and data services. Alpha repositories use mock data; Beta repositories use Firebase without requiring a rewrite of the screens.
+
+### Visual theme
+
+Use a restrained, familiar default light theme with standard Flutter/Material controls, readable typography, and modest color accents. Provide a dark-mode option from Profile settings, with `system`, `light`, and `dark` preferences persisted per user or locally before sign-in. All screens, media states, map overlays, timeline cards, dialogs, and error states must define both light and dark colors without relying on brightness-sensitive images or low-contrast text.
+
+Use the supplied Pastport reference as visual direction rather than a literal screen specification: warm paper-like neutrals, deep teal recording and navigation surfaces, restrained terracotta and gold accents, editorial display typography paired with readable sans-serif body text, rounded cards, and prominent photographic evidence. Keep controls familiar and accessible; texture, badges, and map styling remain secondary to story readability.
+
+### Firebase backend
+
+- Firebase Authentication for accounts and sign-in.
+- Cloud Firestore for users, stories, events, family collections, questions, and permissions.
+- Firestore evidence metadata; binary media storage remains deferred until a storage provider is available.
+- Cloud Functions for media processing, transcription orchestration, metadata extraction, daily-question scheduling, notifications, and moderation hooks.
+- Firebase App Check, Security Rules, and audit logging for access control.
+- Firebase Analytics and Crashlytics for usage and reliability.
+
+### Core story model
+
+Each story should support:
+
+- Title, description, creator, and story type: oral, local, family, cultural, or personal.
+- Evidence classification: firsthand memory, oral account, documented fact, or unverified story.
+- Exact or approximate dates and one or more locations with coordinates and readable place names.
+- Photographs, recordings, documents, and other evidence.
+- Related people, families, events, and stories.
+- Visibility: public, private, family-only, or invited users.
+- Store only fields needed by an active app feature; retain timestamps primarily for users, stories, and timeline events.
+- Review status, edit history, and original content alongside any generated text.
+
+## Iterative development slices
+
+### Slice 0: Product and technical preparation
+
+Define the visual language, information architecture, permission model, and Firebase schema before feature implementation.
+
+Deliverables:
+
+- Navigation map and screen inventory.
+- Story, evidence, location, timeline, family, and question data contracts.
+- Privacy and visibility rules.
+- Development, staging, and production Firebase environments.
+- Representative seed data for family memories, local events, documented facts, and unverified stories.
+- Visual direction and screen inventory covering Explore Map, Story, Record, Timeline, Quest Board, Community, Collection, Families, and Profile.
+- Accessibility, media-retention, consent, and deletion requirements.
+
+### Alpha: designed app with mock data
+
+The first complete milestone is an interactive prototype that demonstrates the product without depending on Firebase.
+
+Include:
+
+- Onboarding and profile creation using local mock state.
+- Home feed showing featured and recent stories.
+- Story detail with text, creator, evidence classification, dates, location, and attachments.
+- Create-story flow with mock photograph, document, and recording attachments.
+- Interactive mock history map with tappable story markers.
+- Interactive mock timeline with chronological story cards.
+- Recording as the primary create action, with a visible central record control and guided prompt state.
+- Quest Board for optional daily questions and place-based history prompts.
+- Community feed for public stories with creator attribution and evidence labels.
+- Collection and Profile views showing saved stories, recordings, badges, and contribution history without turning sensitive stories into a leaderboard.
+- Family-history view showing public collections with individually public or private stories.
+- Recording screen with simulated recording and playback states.
+- Daily-question card with a locally stored answer flow.
+- Search and filters for story type, evidence type, date, family, and location.
+- Visibility controls represented in the interface, even while enforcement is mocked.
+
+Alpha acceptance criteria:
+
+- A user can navigate from discovery to a story, map location, timeline event, family collection, and daily question.
+- A user can create and edit a mock story with all core metadata.
+- Map and timeline provide two distinct paths to the same story.
+- The interface clearly distinguishes memory, oral account, documented fact, and unverified story.
+- Empty, loading, error, and no-results states are designed.
+- Widget and golden tests cover primary navigation and story creation.
+- The map, record action, and story evidence are visually prominent in the default Explore experience.
+
+### Beta: Firebase connection and persistence
+
+Replace mock repositories with Firebase while preserving the Alpha UI.
+
+Implement:
+
+- Firebase Authentication.
+- Firestore repositories for users, stories, families, questions, and timeline events.
+- Firestore-only evidence metadata; binary media upload is deferred.
+- Security Rules for private, family-only, invited, and public content.
+- Real-time story and collection updates.
+- Development seed data and Firebase Emulator Suite support.
+- Environment configuration for development, staging, and production.
+
+Beta acceptance criteria:
+
+- A user can register, sign in, sign out, and recover access.
+- Stories persist across sessions and devices.
+- Evidence metadata is stored in Firestore and associated with the correct story; binary media upload is deferred.
+- Unauthorized users cannot read private or family-only content.
+- Map and timeline render Firestore data.
+- Automated Rules tests cover ownership, family roles, invitations, and public access.
+
+### Slice 1: Real story creation and evidence
+
+Replace mocked creation with a complete evidence workflow:
+
+- Story metadata form and draft saving.
+- Multi-file upload for photographs and documents.
+- Audio and video attachments.
+- Evidence classification and source notes.
+- Approximate dates and multiple locations.
+- Evidence preview, ordering, editing, and deletion.
+- Creator attribution and edit history.
+
+### Slice 2: Recording and oral-history workflow
+
+Implement direct recording of someone telling their story:
+
+- Microphone permission and consent explanation.
+- Start, pause, resume, stop, and playback.
+- Background interruption recovery and long-recording resilience.
+- Upload progress, retry, and local recovery.
+- Recording linked to a story or interview session.
+- Original audio preservation and manual transcript correction.
+
+### Slice 3: Map and timeline exploration
+
+Make the two core discovery experiences production-ready.
+
+Map capabilities:
+
+- Story markers with clustering and location detail cards.
+- Filters by date, story type, evidence type, family, and visibility.
+- Marker-to-story navigation.
+- Approximate-location handling for sensitive stories.
+- Accessible list alternative to the map.
+
+Timeline capabilities:
+
+- Chronological event grouping with approximate dates and date ranges.
+- Multiple stories attached to one event.
+- Family and community timeline modes.
+- Filters, search, and links between timeline events and map locations.
+
+Optional place-based discovery overlays can add nearby prompts, progress indicators, and quests after the core map and timeline are stable. Every quest interaction must have an accessible list alternative.
+
+### Slice 4: Family histories and sharing
+
+Implement public family-history collections with per-story privacy:
+
+- Create family or community collections.
+- Invite members and assign owner, editor, or contributor roles.
+- Add or remove stories from collections.
+- Collection visibility is always public; individual stories can be public or private.
+- Contribution approval, access revocation, and story removal.
+- Export or archive family-history data.
+
+Add a separate public Community surface for public stories. Community follows, reactions, and badges are opt-in and secondary to reading and preserving the story.
+
+### Slice 5: Daily questions
+
+Introduce recurring prompts as an engagement layer:
+
+- Cloud Function scheduling with time-zone support.
+- Questions about childhood, recipes, work, migration, local places, and celebrations.
+- Text, photo, and recording answers.
+- Save as a private draft or convert to a story.
+- Question history, reminders, moderation, and reporting.
+
+Daily questions can appear in the Quest Board as a low-pressure participation loop. Users can answer privately; public participation is never required.
+
+### Slice 6: AI enrichment and advanced discovery
+
+Add AI after evidence, permissions, and review workflows are stable:
+
+- Original-language speech transcription.
+- Clean summaries that preserve uncertainty and attribution.
+- Translation into the selected language.
+- Suggested dates, places, people, and topics.
+- Related-story recommendations and search across transcripts, summaries, people, places, and dates.
+- Human review before generated content is published.
+- Provider, model, version, and processing timestamp recorded for each artifact.
+
+AI-generated text must remain distinguishable from the original account and editable by the user.
+
+## MVP scope
+
+The MVP is the full feature set: authenticated accounts, story creation, photographs, recordings, documents, evidence classification, Firebase persistence and security, map, timeline, public family groups with per-story privacy, daily questions, optional Quest Board prompts, a moderated Community feed for public stories, transcription, summaries, translation, search, filtering, sharing, deletion, privacy controls, accessibility support, analytics, crash reporting, and comprehensive testing. Collection metrics and badges remain lightweight contribution summaries rather than competitive rankings.
+
+## Testing strategy
+
+- Flutter unit tests for models, repositories, validation, upload queues, and state transitions.
+- Widget and golden tests for every primary user flow.
+- Integration tests using the Firebase Emulator Suite.
+- Firebase Security Rules tests for ownership, family roles, invitations, and public access.
+- Media tests for permissions, interrupted recording, large uploads, retries, and offline recovery.
+- Map and timeline tests for date ranges, approximate locations, clustering, filters, and privacy.
+- AI evaluation tests for transcript fidelity, translation quality, names, dates, accents, code-switching, and hallucination avoidance.
+- Accessibility tests for screen readers, text scaling, contrast, captions, and non-map alternatives.
+- Theme tests for light mode, dark mode, system preference changes, contrast, and persisted theme selection.
+- Performance tests for long recordings, low storage, weak connectivity, and older phones.
+
+## Release sequence
+
+1. Product foundation and data contracts.
+2. Alpha: mock-data app with complete navigation and visual design.
+3. Beta: Firebase authentication, Firestore database, and Security Rules.
+4. Real story and evidence creation.
+5. Recording and upload workflow.
+6. Map and timeline experiences.
+7. Family histories and sharing.
+8. Daily questions.
+9. AI enrichment and advanced search.
+10. MVP hardening, privacy review, accessibility, performance testing, and pilot release.
+
+## Assumptions and defaults
+
+- Flutter targets iOS and Android first.
+- Firebase is the required backend; Firebase Emulator Suite is used during development.
+- Stories are public by default; authors can choose private, family-only, or invited visibility before posting or change it later.
+- Family groups are automatically public and cannot be made private; stories within them retain independent visibility.
+- The app supports approximate dates and locations for uncertain or sensitive histories.
+- Public archives, classroom dashboards, collaborative editing, and broad multilingual support can follow the MVP unless pilot requirements elevate them.
