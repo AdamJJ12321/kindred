@@ -1,74 +1,49 @@
-# Kindred Beta setup
+# Kindred Beta C
 
-## Firebase project
+Kindred is a Flutter app for preserving and exploring oral, family, cultural, local, and personal histories. This repository is the Flutter app root and uses Firebase Auth and Firestore. Binary media uploads remain deferred in Beta; evidence is currently Firestore metadata under `stories/{storyId}/evidence/{evidenceId}`.
 
-The Flutter app is configured for Firebase project `my1stapp-b4b47`.
+## Local emulator development
 
-Platform configuration is stored in:
-
-- `lib/firebase_options.dart`
-- `android/app/google-services.json`
-- `ios/Runner/GoogleService-Info.plist`
-
-Firestore configuration is stored in `firebase.json`, `firestore.rules`, and `firestore.indexes.json`.
-
-## Local checks
-
-From this directory:
-
-```bash
-flutter pub get
-flutter test
-```
-
-## Firebase deployment
-
-After authenticating with Firebase CLI and selecting `my1stapp-b4b47`, deploy the Beta rules and indexes from this directory:
-
-```bash
-firebase deploy --only firestore:rules,firestore:indexes
-```
-
-## Email/password authentication
-
-Enable **Authentication → Sign-in method → Email/Password** in the Firebase console for `my1stapp-b4b47`. The app supports registration, sign-in, sign-out, and password reset from Profile. A `users/{uid}` profile is created or merged after registration and sign-in.
-
-To refresh platform configuration after changing Firebase apps:
-
-```bash
-flutterfire configure --project=my1stapp-b4b47
-```
-
-## Emulator Suite
-
-Install the Firebase CLI, then run from `app/`:
+Install Flutter, Node.js, the Firebase CLI, and a Java runtime required by the emulators. From this directory:
 
 ```bash
 firebase emulators:start --only auth,firestore
+flutter run --dart-define=USE_FIREBASE_EMULATORS=true
 ```
 
-This starts only the Auth and Firestore emulators on ports 9099 and 8080; the Emulator UI is at `http://127.0.0.1:4000`. The checked-in local seed is `../docs/slice-0/seed-data.json`. Import it through the Emulator UI or a local, disposable seed script while the emulators are running. Do not point local development at the production project, and do not add service-account credentials.
+Auth runs on `9099`, Firestore on `8080`, and the Emulator UI on `http://127.0.0.1:4000`. The app connects to Auth and Firestore emulators only when the dart define is enabled.
 
-Run the Flutter app against those emulators with `flutter run --dart-define=USE_FIREBASE_EMULATORS=true`.
-
-The emulator UI is available at `http://127.0.0.1:4000`. Start Auth and Firestore for the current Beta scope:
+The checked-in `seed-data.json` is a local, disposable Firestore seed. With emulators running, install Rules-test dependencies and load it with:
 
 ```bash
-firebase emulators:start --only auth,firestore
+cd rules-tests
+npm install
+node seed-emulator.js
 ```
 
-Load representative records from `../docs/slice-0/seed-data.json` using the Firebase console or a local seed script; never commit service-account credentials or production secrets. Use separate Firebase projects for local, staging, and production. Binary media storage is deferred; current evidence fields remain Firestore metadata only.
+The Emulator UI at `http://127.0.0.1:4000` can then be used to inspect or clear the seeded Firestore data. Auth users can be created through the Auth emulator UI; the seed contains Firestore profile records only. Do not use production credentials or secrets for local seeding.
 
-Rules tests live in `rules-tests/` and use the Firebase Emulator Suite:
+## Checks
+
+Start the emulators in one terminal, then run:
 
 ```bash
 cd rules-tests
 npm install
 npm test
+cd ..
+flutter analyze
+flutter test
 ```
 
-Start `firebase emulators:start --only auth,firestore` in another terminal before `npm test` (the tests target Firestore at `127.0.0.1:8080`).
+The Rules tests target `127.0.0.1:8080` and cover stories, evidence ACLs, families/members, users, daily questions, and timeline events. Deploy reviewed Firestore changes with:
 
-The Jest rules tests start an in-process Firestore rules test environment, so no production Firestore data is touched. They cover allowed and denied reads/writes for stories, evidence ownership, profiles, families, daily questions, and timeline events.
+```bash
+firebase deploy --only firestore:rules,firestore:indexes
+```
 
-Evidence is metadata-only under `stories/{storyId}/evidence/{evidenceId}` (`kind`, optional `fileName`, `caption`, `sourceNote`, and `uploadedBy`). Binary photo, document, audio, and video support remains deferred.
+## Environments and security
+
+Local uses Auth/Firestore emulators and disposable synthetic seed data. Staging must use an isolated Firebase project with synthetic or consented data. Production requires reviewed Rules/index deployment, restricted access, backups, monitoring, and no committed service credentials. Firebase client configuration is non-secret; never commit service-account keys, API secrets, or binary media.
+
+Auth flows and repository patterns already exist. The app preserves the Pastport-inspired parchment, teal, terracotta, editorial/sans visual direction and dark mode. Storage, recording, AI, and later slices are intentionally out of scope.

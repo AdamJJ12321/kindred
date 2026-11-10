@@ -262,6 +262,7 @@ class _ExplorePageState extends State<ExplorePage> {
     final stories = _filter == 'All'
         ? mockStories
         : mockStories.where((s) => s.type == _filter).toList();
+    final firebaseReady = Firebase.apps.isNotEmpty;
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
       children: [
@@ -288,7 +289,11 @@ class _ExplorePageState extends State<ExplorePage> {
                 ),
                 const SizedBox(height: 8),
                 StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                  stream: Firebase.apps.isEmpty ? const Stream<QuerySnapshot<Map<String, dynamic>>>.empty() : QuestionRepository().watchRecentQuestions(),
+                  stream: Firebase.apps.isEmpty
+                      ? const Stream<
+                          QuerySnapshot<Map<String, dynamic>>
+                        >.empty()
+                      : QuestionRepository().watchRecentQuestions(),
                   builder: (context, snapshot) {
                     final question =
                         snapshot.data?.docs.firstOrNull?.data()['prompt']
@@ -310,8 +315,9 @@ class _ExplorePageState extends State<ExplorePage> {
           ),
         ),
         const SizedBox(height: 22),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          runSpacing: 12,
           children: [
             Text(
               _map ? 'History map' : 'Recent stories',
@@ -320,11 +326,12 @@ class _ExplorePageState extends State<ExplorePage> {
             ),
             Row(
               children: [
-                FilterChip(
-                  label: const Text('Live'),
-                  selected: _live,
-                  onSelected: (value) => setState(() => _live = value),
-                ),
+                if (!firebaseReady)
+                  FilterChip(
+                    label: const Text('Offline sample'),
+                    selected: !_live,
+                    onSelected: (_) {},
+                  ),
                 const SizedBox(width: 8),
                 SegmentedButton<bool>(
                   segments: const [
@@ -348,7 +355,7 @@ class _ExplorePageState extends State<ExplorePage> {
         ),
         const SizedBox(height: 12),
         if (_map)
-          const MapPreview()
+          firebaseReady ? LiveStoryMap(filter: _filter) : const MapPreview()
         else ...[
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
@@ -368,8 +375,8 @@ class _ExplorePageState extends State<ExplorePage> {
             ),
           ),
           const SizedBox(height: 12),
-          if (_live) ...[
-            LiveStoryFeed(onStoryTap: widget.onStoryTap),
+          if (firebaseReady) ...[
+            LiveStoryFeed(onStoryTap: widget.onStoryTap, filter: _filter),
             const TimelineLive(),
           ] else
             ...stories.map(
@@ -385,9 +392,14 @@ class _ExplorePageState extends State<ExplorePage> {
 }
 
 class LiveStoryFeed extends StatelessWidget {
-  const LiveStoryFeed({super.key, required this.onStoryTap});
+  const LiveStoryFeed({
+    super.key,
+    required this.onStoryTap,
+    required this.filter,
+  });
 
   final ValueChanged<Story> onStoryTap;
+  final String filter;
 
   @override
   Widget build(BuildContext context) {
@@ -420,24 +432,73 @@ class LiveStoryFeed extends StatelessWidget {
           );
         }
         return Column(
-          children: snapshot.data!.docs.map((doc) {
-            final data = doc.data();
-            final story = Story(
-              title: data['title'] as String? ?? 'Untitled story',
-              description: data['description'] as String? ?? '',
-              type: data['storyType'] as String? ?? 'Personal',
-              evidence: data['evidenceType'] as String? ?? 'Oral account',
-              date: 'A recent memory',
-              location: 'Location not added',
-              creator: data['creatorId'] as String? ?? 'Kindred storyteller',
-              visibility: data['visibility'] as String? ?? 'Public',
-            );
-            return StoryCard(story: story, onTap: () => onStoryTap(story));
-          }).toList(),
+          children: snapshot.data!.docs
+              .where(
+                (doc) =>
+                    filter == 'All' ||
+                    (doc.data()['storyType'] as String? ?? '').toLowerCase() ==
+                        filter.toLowerCase(),
+              )
+              .map((doc) {
+                final data = doc.data();
+                final story = Story(
+                  title: data['title'] as String? ?? 'Untitled story',
+                  description: data['description'] as String? ?? '',
+                  type: data['storyType'] as String? ?? 'Personal',
+                  evidence: data['evidenceType'] as String? ?? 'Oral account',
+                  date: 'A recent memory',
+                  location: 'Location not added',
+                  creator:
+                      data['creatorId'] as String? ?? 'Kindred storyteller',
+                  visibility: data['visibility'] as String? ?? 'Public',
+                );
+                return StoryCard(story: story, onTap: () => onStoryTap(story));
+              })
+              .toList(),
         );
       },
     );
   }
+}
+
+class LiveStoryMap extends StatelessWidget {
+  const LiveStoryMap({super.key, required this.filter});
+  final String filter;
+  @override
+  Widget build(BuildContext context) =>
+      StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: FirestoreStoryRepository().watchPublicStories(),
+        builder: (context, snapshot) {
+          if (snapshot.hasError)
+            return const ListTile(
+              leading: Icon(Icons.cloud_off),
+              title: Text('Live map unavailable'),
+            );
+          if (!snapshot.hasData)
+            return const Center(child: CircularProgressIndicator());
+          final count = snapshot.data!.docs
+              .where(
+                (doc) =>
+                    filter == 'All' ||
+                    (doc.data()['storyType'] as String? ?? '').toLowerCase() ==
+                        filter.toLowerCase(),
+              )
+              .length;
+          return Container(
+            height: 360,
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Center(
+              child: Text(
+                '$count live stories\nMap coordinates will render here',
+                textAlign: TextAlign.center,
+              ),
+            ),
+          );
+        },
+      );
 }
 
 class TimelineLive extends StatelessWidget {

@@ -38,6 +38,18 @@ test('only the owner can create a story for their uid', async () => {
   await assertSucceeds(setDoc(doc(owner, 'stories/new'), { creatorId: 'owner', status: 'draft', visibility: 'private' }));
   const other = env.authenticatedContext('other').firestore();
   await assertFails(setDoc(doc(other, 'stories/forged'), { creatorId: 'owner', status: 'draft', visibility: 'private' }));
+  await assertSucceeds(getDoc(doc(owner, 'stories/new')));
+  await assertFails(getDoc(doc(other, 'stories/new')));
+});
+
+test('evidence follows parent story access and cannot spoof uploader', async () => {
+  await env.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), 'stories/s1'), { creatorId: 'owner', status: 'published', visibility: 'public' });
+    await setDoc(doc(context.firestore(), 'stories/s1/evidence/e1'), { kind: 'oral_account', uploadedBy: 'owner' });
+  });
+  await assertSucceeds(getDoc(doc(env.unauthenticatedContext().firestore(), 'stories/s1/evidence/e1')));
+  await assertSucceeds(setDoc(doc(env.authenticatedContext('owner').firestore(), 'stories/s1/evidence/e2'), { kind: 'document', uploadedBy: 'owner' }));
+  await assertFails(setDoc(doc(env.authenticatedContext('other').firestore(), 'stories/s1/evidence/e3'), { kind: 'document', uploadedBy: 'owner' }));
 });
 
 test('invited and family stories are limited to allowed readers', async () => {
