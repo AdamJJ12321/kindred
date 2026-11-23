@@ -36,7 +36,7 @@ class DiscoveryRepository {
     final source = mockStories.where(
       (s) => mode == DiscoveryMode.family
           ? s.visibility == 'Family' || s.type == 'Family'
-          : true,
+          : s.visibility != 'Private',
     );
     final q = filters.query.trim().toLowerCase();
     return source.where((s) {

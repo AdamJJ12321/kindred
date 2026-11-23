@@ -596,6 +596,8 @@ class _ExplorePageState extends State<ExplorePage> {
           ),
           const SizedBox(height: 12),
           if (firebaseReady) ...[
+            if (FirebaseAuth.instance.currentUser != null)
+              LiveOwnStoryFeed(onStoryTap: widget.onStoryTap, filter: _filter),
             LiveStoryFeed(onStoryTap: widget.onStoryTap, filter: _filter),
             const TimelineLive(),
           ] else
@@ -680,6 +682,78 @@ class LiveStoryFeed extends StatelessWidget {
       },
     );
   }
+}
+
+class LiveOwnStoryFeed extends LiveStoryFeed {
+  const LiveOwnStoryFeed({
+    super.key,
+    required super.onStoryTap,
+    required super.filter,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return const SizedBox.shrink();
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirestoreStoryRepository().watchStoriesForCreator(user.uid),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        final stories = snapshot.data!.docs
+            .where((doc) {
+              final data = doc.data();
+              return filter == 'All' ||
+                  (data['storyType'] as String? ?? '').toLowerCase() ==
+                      filter.toLowerCase();
+            })
+            .map((doc) => _storyFromDocument(doc))
+            .toList();
+        if (stories.isEmpty) return const SizedBox.shrink();
+        return Card(
+          child: Column(
+            children: [
+              const ListTile(
+                title: Text(
+                  'Your stories',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+              ...stories.map(
+                (story) => ListTile(
+                  title: Text(story.title),
+                  subtitle: Text('${story.visibility} · ${story.date}'),
+                  onTap: () => onStoryTap(story),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+Story _storyFromDocument(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+  final data = doc.data();
+  return Story(
+    storyId: doc.id,
+    title: data['title'] as String? ?? 'Untitled story',
+    description: data['description'] as String? ?? '',
+    type: data['storyType'] as String? ?? 'Personal',
+    evidence: data['evidenceType'] as String? ?? 'Oral account',
+    date:
+        (data['date'] as Map<String, dynamic>?)?['start'] as String? ??
+        'Unknown',
+    location: (data['locations'] as List?)?.isNotEmpty == true
+        ? ((data['locations'] as List).first as Map<String, dynamic>)['label']
+                  as String? ??
+              'Location not added'
+        : 'Location not added',
+    creator: data['creatorId'] as String? ?? 'Kindred storyteller',
+    visibility: data['visibility'] as String? ?? 'Private',
+  );
 }
 
 class LiveStoryMap extends StatelessWidget {
@@ -1268,9 +1342,7 @@ class _StoryFormState extends State<StoryForm> {
   final _dateStart = TextEditingController();
   final _dateEnd = TextEditingController();
   final _locationLabel = TextEditingController();
-  final _locationLatitude = TextEditingController();
-  final _locationLongitude = TextEditingController();
-  String _locationPrecision = 'city';
+  String _locationPrecision = '';
   final List<Map<String, dynamic>> _locations = [];
   static const _usaCities = <String>[
     'San Francisco, California',
@@ -1451,7 +1523,7 @@ class _StoryFormState extends State<StoryForm> {
               child: DropdownButtonFormField<String>(
                 initialValue: _dateShape,
                 decoration: const InputDecoration(
-                  labelText: 'Shape',
+                  labelText: 'Period',
                   border: OutlineInputBorder(),
                 ),
                 items: const [
@@ -1493,55 +1565,58 @@ class _StoryFormState extends State<StoryForm> {
           ),
         ],
         const SizedBox(height: 14),
-        Autocomplete<String>(
-          optionsBuilder: (value) {
-            if (value.text.trim().isEmpty || _locationPrecision != 'city') {
-              return const Iterable<String>.empty();
-            }
-            final query = value.text.toLowerCase();
-            return _usaCities.where(
-              (city) => city.toLowerCase().startsWith(query),
-            );
-          },
-          onSelected: (value) => _locationLabel.text = value,
-          fieldViewBuilder: (context, controller, focusNode, onSubmitted) {
-            controller.addListener(() => _locationLabel.text = controller.text);
-            return TextField(
-              controller: controller,
-              focusNode: focusNode,
-              decoration: const InputDecoration(
-                labelText: 'USA city',
-                hintText: 'Type e.g. san',
-                border: OutlineInputBorder(),
-              ),
-            );
-          },
-          optionsViewBuilder: (context, onSelected, options) => Align(
-            alignment: Alignment.topLeft,
-            child: Material(
-              elevation: 4,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                  maxHeight: 220,
-                  maxWidth: 360,
+        if (_locationPrecision.isNotEmpty)
+          Autocomplete<String>(
+            optionsBuilder: (value) {
+              if (value.text.trim().isEmpty || _locationPrecision != 'city') {
+                return const Iterable<String>.empty();
+              }
+              final query = value.text.toLowerCase();
+              return _usaCities.where(
+                (city) => city.toLowerCase().startsWith(query),
+              );
+            },
+            onSelected: (value) => _locationLabel.text = value,
+            fieldViewBuilder: (context, controller, focusNode, onSubmitted) {
+              controller.addListener(
+                () => _locationLabel.text = controller.text,
+              );
+              return TextField(
+                controller: controller,
+                focusNode: focusNode,
+                decoration: const InputDecoration(
+                  labelText: 'USA city',
+                  hintText: 'Type e.g. san',
+                  border: OutlineInputBorder(),
                 ),
-                child: ListView(
-                  children: options
-                      .map(
-                        (city) => ListTile(
-                          title: Text(city),
-                          onTap: () => onSelected(city),
-                        ),
-                      )
-                      .toList(),
+              );
+            },
+            optionsViewBuilder: (context, onSelected, options) => Align(
+              alignment: Alignment.topLeft,
+              child: Material(
+                elevation: 4,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxHeight: 220,
+                    maxWidth: 360,
+                  ),
+                  child: ListView(
+                    children: options
+                        .map(
+                          (city) => ListTile(
+                            title: Text(city),
+                            onTap: () => onSelected(city),
+                          ),
+                        )
+                        .toList(),
+                  ),
                 ),
               ),
             ),
           ),
-        ),
         const SizedBox(height: 10),
         DropdownButtonFormField<String>(
-          initialValue: _locationPrecision,
+          initialValue: _locationPrecision.isEmpty ? null : _locationPrecision,
           decoration: const InputDecoration(
             labelText: 'Location precision',
             border: OutlineInputBorder(),
@@ -1558,35 +1633,6 @@ class _StoryFormState extends State<StoryForm> {
           onChanged: (v) => setState(() => _locationPrecision = v!),
         ),
         const SizedBox(height: 10),
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _locationLatitude,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                decoration: const InputDecoration(
-                  labelText: 'Latitude',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: TextField(
-                controller: _locationLongitude,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                decoration: const InputDecoration(
-                  labelText: 'Longitude',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-            ),
-          ],
-        ),
         const SizedBox(height: 8),
         OutlinedButton.icon(
           onPressed: () {
@@ -1594,13 +1640,9 @@ class _StoryFormState extends State<StoryForm> {
             setState(() {
               _locations.add({
                 'label': _locationLabel.text.trim(),
-                'latitude': double.tryParse(_locationLatitude.text.trim()),
-                'longitude': double.tryParse(_locationLongitude.text.trim()),
                 'precision': _locationPrecision,
               });
               _locationLabel.clear();
-              _locationLatitude.clear();
-              _locationLongitude.clear();
             });
           },
           icon: const Icon(Icons.add_location_alt_outlined),

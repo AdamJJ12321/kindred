@@ -18,6 +18,16 @@ class FirestoreStoryRepository {
         .snapshots();
   }
 
+  Stream<QuerySnapshot<Map<String, dynamic>>> watchStoriesForCreator(
+    String creatorId,
+  ) {
+    return _firestore
+        .collection('stories')
+        .where('creatorId', isEqualTo: creatorId)
+        .orderBy('updatedAt', descending: true)
+        .snapshots();
+  }
+
   Future<DocumentReference<Map<String, dynamic>>> createStory({
     required String creatorId,
     required String title,
