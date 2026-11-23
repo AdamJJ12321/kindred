@@ -6,22 +6,46 @@ service cloud.firestore {
 
     function ownsStory() { return signedIn() && resource.data.creatorId == request.auth.uid; }
     function ownsParentStory(storyId) { return signedIn() && get(/databases/$(database)/documents/stories/$(storyId)).data.creatorId == request.auth.uid; }
-    // Public published stories: anyone. Private/family published: creator or
-    // listed family members. Invited: allow-list only. Drafts: creator only.
+    // Separate allow paths so Explore list queries on public+published stay valid.
+    function isOwner() {
+      return signedIn() && resource.data.creatorId == request.auth.uid;
+    }
+    function isPublicPublished() {
+      return resource.data.status == 'published'
+        && resource.data.visibility == 'public';
+    }
+    function isFamilyReadable() {
+      return signedIn()
+        && resource.data.status == 'published'
+        && (resource.data.visibility == 'private'
+          || resource.data.visibility == 'family')
+        && resource.data.keys().hasAny(['familyMemberIds'])
+        && resource.data.familyMemberIds.hasAny([request.auth.uid]);
+    }
+    function isInvitedReadable() {
+      return signedIn()
+        && resource.data.status == 'published'
+        && resource.data.visibility == 'invited'
+        && resource.data.keys().hasAny(['allowedUserIds'])
+        && resource.data.allowedUserIds.hasAny([request.auth.uid]);
+    }
     function storyIsReadable(story) {
-      return (signedIn() && story.data.creatorId == request.auth.uid) ||
-        (story.data.status == 'published' && (
-          story.data.visibility == 'public' ||
-          (signedIn() &&
-            (story.data.visibility == 'private' || story.data.visibility == 'family') &&
-            story.data.familyMemberIds.hasAny([request.auth.uid])) ||
-          (signedIn() &&
-            story.data.visibility == 'invited' &&
-            story.data.allowedUserIds.hasAny([request.auth.uid]))
-        ));
+      return (signedIn() && story.data.creatorId == request.auth.uid)
+        || (story.data.status == 'published' && story.data.visibility == 'public')
+        || (signedIn()
+          && story.data.status == 'published'
+          && (story.data.visibility == 'private' || story.data.visibility == 'family')
+          && story.data.keys().hasAny(['familyMemberIds'])
+          && story.data.familyMemberIds.hasAny([request.auth.uid]))
+        || (signedIn()
+          && story.data.status == 'published'
+          && story.data.visibility == 'invited'
+          && story.data.keys().hasAny(['allowedUserIds'])
+          && story.data.allowedUserIds.hasAny([request.auth.uid]));
     }
     function canReadStory() {
-      return storyIsReadable(resource);
+      return isOwner() || isPublicPublished() || isFamilyReadable()
+        || isInvitedReadable();
     }
     function isFamilyMember(familyId) {
       return signedIn() &&

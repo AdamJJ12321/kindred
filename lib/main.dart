@@ -632,14 +632,14 @@ class LiveStoryFeed extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+    return StreamBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
       stream: FirestoreStoryRepository().watchPublicStories(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return Card(
             child: ListTile(
               leading: const Icon(Icons.cloud_off_outlined),
-              title: const Text('Live stories are unavailable'),
+              title: const Text('Public stories unavailable'),
               subtitle: Text('${snapshot.error}'),
             ),
           );
@@ -652,72 +652,101 @@ class LiveStoryFeed extends StatelessWidget {
             ),
           );
         }
-        if (snapshot.data!.docs.isEmpty) {
+        final docs = snapshot.data!
+            .where(
+              (doc) =>
+                  filter == 'All' ||
+                  (doc.data()['storyType'] as String? ?? '').toLowerCase() ==
+                      filter.toLowerCase(),
+            )
+            .toList();
+        if (docs.isEmpty) {
           return const Card(
             child: ListTile(
               title: Text('No public stories yet'),
-              subtitle: Text('Be the first to share one.'),
+              subtitle: Text(
+                'Publish a story with visibility Public to see it here.',
+              ),
             ),
           );
         }
         return Column(
-          children: snapshot.data!.docs
-              .where(
-                (doc) =>
-                    filter == 'All' ||
-                    (doc.data()['storyType'] as String? ?? '').toLowerCase() ==
-                        filter.toLowerCase(),
-              )
-              .map((doc) {
-                final data = doc.data();
-                final story = Story(
-                  storyId: doc.id,
-                  title: data['title'] as String? ?? 'Untitled story',
-                  description: data['description'] as String? ?? '',
-                  type: data['storyType'] as String? ?? 'Personal',
-                  evidence: data['evidenceType'] as String? ?? 'Oral account',
-                  date: 'A recent memory',
-                  location: 'Location not added',
-                  creator:
-                      data['creatorId'] as String? ?? 'Kindred storyteller',
-                  visibility: data['visibility'] as String? ?? 'Public',
-                );
-                return StoryCard(story: story, onTap: () => onStoryTap(story));
-              })
-              .toList(),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.only(bottom: 8),
+              child: Text(
+                'Public stories',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+            ...docs.map((doc) {
+              final story = _storyFromDocument(doc);
+              return StoryCard(story: story, onTap: () => onStoryTap(story));
+            }),
+          ],
         );
       },
     );
   }
 }
 
-class LiveOwnStoryFeed extends LiveStoryFeed {
+class LiveOwnStoryFeed extends StatelessWidget {
   const LiveOwnStoryFeed({
     super.key,
-    required super.onStoryTap,
-    required super.filter,
+    required this.onStoryTap,
+    required this.filter,
   });
+
+  final ValueChanged<Story> onStoryTap;
+  final String filter;
 
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return const SizedBox.shrink();
-    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+    if (user == null) {
+      return const Card(
+        child: ListTile(
+          title: Text('Sign in to see your private stories'),
+          subtitle: Text('Your own posts appear here after you sign in.'),
+        ),
+      );
+    }
+    return StreamBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
       stream: FirestoreStoryRepository().watchStoriesForCreator(user.uid),
       builder: (context, snapshot) {
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return const SizedBox.shrink();
+        if (snapshot.hasError) {
+          return Card(
+            child: ListTile(
+              leading: const Icon(Icons.error_outline),
+              title: const Text('Could not load your stories'),
+              subtitle: Text('${snapshot.error}'),
+            ),
+          );
         }
-        final stories = snapshot.data!.docs
+        if (!snapshot.hasData) {
+          return const Padding(
+            padding: EdgeInsets.all(16),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+        final stories = snapshot.data!
             .where((doc) {
               final data = doc.data();
               return filter == 'All' ||
                   (data['storyType'] as String? ?? '').toLowerCase() ==
                       filter.toLowerCase();
             })
-            .map((doc) => _storyFromDocument(doc))
+            .map(_storyFromDocument)
             .toList();
-        if (stories.isEmpty) return const SizedBox.shrink();
+        if (stories.isEmpty) {
+          return const Card(
+            child: ListTile(
+              title: Text('No stories of yours yet'),
+              subtitle: Text('Create a public or private story to see it here.'),
+            ),
+          );
+        }
         return Card(
           child: Column(
             children: [
@@ -727,13 +756,15 @@ class LiveOwnStoryFeed extends LiveStoryFeed {
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 subtitle: Text(
-                  'Private posts stay with you and listed family members',
+                  'Includes private posts (only you and listed family)',
                 ),
               ),
               ...stories.map(
                 (story) => ListTile(
                   title: Text(story.title),
-                  subtitle: Text('${story.visibility} · ${story.date}'),
+                  subtitle: Text(
+                    '${story.visibility} · ${story.type} · ${story.date}',
+                  ),
                   onTap: () => onStoryTap(story),
                 ),
               ),
@@ -771,19 +802,20 @@ class LiveStoryMap extends StatelessWidget {
   final String filter;
   @override
   Widget build(BuildContext context) =>
-      StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      StreamBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
         stream: FirestoreStoryRepository().watchPublicStories(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            return const ListTile(
-              leading: Icon(Icons.cloud_off),
-              title: Text('Live map unavailable'),
+            return ListTile(
+              leading: const Icon(Icons.cloud_off),
+              title: const Text('Live map unavailable'),
+              subtitle: Text('${snapshot.error}'),
             );
           }
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
-          final count = snapshot.data!.docs
+          final count = snapshot.data!
               .where(
                 (doc) =>
                     filter == 'All' ||

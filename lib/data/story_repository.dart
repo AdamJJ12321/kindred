@@ -9,23 +9,48 @@ class FirestoreStoryRepository {
 
   final FirebaseFirestore _firestore;
 
-  Stream<QuerySnapshot<Map<String, dynamic>>> watchPublicStories() {
+  /// Public published stories for Explore. Sorted client-side so a missing
+  /// composite index cannot blank the feed.
+  Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>>
+  watchPublicStories() {
     return _firestore
         .collection('stories')
         .where('visibility', isEqualTo: 'public')
         .where('status', isEqualTo: 'published')
-        .orderBy('createdAt', descending: true)
-        .snapshots();
+        .snapshots()
+        .map((snapshot) {
+          final docs = [...snapshot.docs];
+          docs.sort((a, b) {
+            final aTime = a.data()['createdAt'];
+            final bTime = b.data()['createdAt'];
+            if (aTime is Timestamp && bTime is Timestamp) {
+              return bTime.compareTo(aTime);
+            }
+            return 0;
+          });
+          return docs;
+        });
   }
 
-  Stream<QuerySnapshot<Map<String, dynamic>>> watchStoriesForCreator(
-    String creatorId,
-  ) {
+  /// All stories owned by [creatorId], including private/drafts.
+  Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>>
+  watchStoriesForCreator(String creatorId) {
     return _firestore
         .collection('stories')
         .where('creatorId', isEqualTo: creatorId)
-        .orderBy('updatedAt', descending: true)
-        .snapshots();
+        .snapshots()
+        .map((snapshot) {
+          final docs = [...snapshot.docs];
+          docs.sort((a, b) {
+            final aTime = a.data()['updatedAt'] ?? a.data()['createdAt'];
+            final bTime = b.data()['updatedAt'] ?? b.data()['createdAt'];
+            if (aTime is Timestamp && bTime is Timestamp) {
+              return bTime.compareTo(aTime);
+            }
+            return 0;
+          });
+          return docs;
+        });
   }
 
   Future<DocumentReference<Map<String, dynamic>>> createStory({
