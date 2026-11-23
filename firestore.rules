@@ -6,13 +6,19 @@ service cloud.firestore {
 
     function ownsStory() { return signedIn() && resource.data.creatorId == request.auth.uid; }
     function ownsParentStory(storyId) { return signedIn() && get(/databases/$(database)/documents/stories/$(storyId)).data.creatorId == request.auth.uid; }
+    // Public published stories: anyone. Private/family published: creator or
+    // listed family members. Invited: allow-list only. Drafts: creator only.
     function storyIsReadable(story) {
       return (signedIn() && story.data.creatorId == request.auth.uid) ||
         (story.data.status == 'published' && (
-        story.data.visibility == 'public' ||
-        (signedIn() && story.data.visibility == 'invited' && story.data.allowedUserIds.hasAny([request.auth.uid])) ||
-        (signedIn() && story.data.visibility == 'family' && story.data.familyMemberIds.hasAny([request.auth.uid]))
-      ));
+          story.data.visibility == 'public' ||
+          (signedIn() &&
+            (story.data.visibility == 'private' || story.data.visibility == 'family') &&
+            story.data.familyMemberIds.hasAny([request.auth.uid])) ||
+          (signedIn() &&
+            story.data.visibility == 'invited' &&
+            story.data.allowedUserIds.hasAny([request.auth.uid]))
+        ));
     }
     function canReadStory() {
       return storyIsReadable(resource);

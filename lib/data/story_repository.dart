@@ -39,8 +39,15 @@ class FirestoreStoryRepository {
     String sourceNotes = '',
     Map<String, dynamic>? date,
     List<Map<String, dynamic>> locations = const [],
+    List<String> familyIds = const [],
+    List<String> familyMemberIds = const [],
   }) {
     final now = FieldValue.serverTimestamp();
+    // Private stories are creator + family members listed on the doc.
+    final members = <String>{...familyMemberIds};
+    if (visibility == 'private' || visibility == 'family') {
+      members.add(creatorId);
+    }
     return _firestore.collection('stories').add({
       'creatorId': creatorId,
       'title': title,
@@ -49,7 +56,8 @@ class FirestoreStoryRepository {
       'evidenceType': evidenceType,
       'visibility': visibility,
       'status': status,
-      'familyIds': <String>[],
+      'familyIds': familyIds,
+      'familyMemberIds': members.toList(),
       'relatedStoryIds': <String>[],
       'createdAt': now,
       'updatedAt': now,

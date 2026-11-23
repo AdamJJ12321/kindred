@@ -719,6 +719,9 @@ class LiveOwnStoryFeed extends LiveStoryFeed {
                   'Your stories',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
+                subtitle: Text(
+                  'Private posts stay with you and listed family members',
+                ),
               ),
               ...stories.map(
                 (story) => ListTile(
@@ -1475,6 +1478,8 @@ class _StoryFormState extends State<StoryForm> {
           initialValue: _visibility,
           decoration: const InputDecoration(
             labelText: 'Who can see it?',
+            helperText:
+                'Public: everyone. Private: you and your family members. Family/Invited: listed people only.',
             border: OutlineInputBorder(),
           ),
           items: [

@@ -27,10 +27,12 @@ test('private stories reject unauthorized reads', async () => {
   await env.withSecurityRulesDisabled(async (context) => {
     await setDoc(doc(context.firestore(), 'stories/private'), {
       creatorId: 'owner', status: 'published', visibility: 'private', title: 'Private story',
+      familyMemberIds: ['relative'],
     });
   });
   await assertFails(getDoc(doc(env.authenticatedContext('other').firestore(), 'stories/private')));
   await assertSucceeds(getDoc(doc(env.authenticatedContext('owner').firestore(), 'stories/private')));
+  await assertSucceeds(getDoc(doc(env.authenticatedContext('relative').firestore(), 'stories/private')));
 });
 
 test('only the owner can create a story for their uid', async () => {
