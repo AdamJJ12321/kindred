@@ -44,7 +44,7 @@ class FirestoreStoryRepository {
       'createdAt': now,
       'updatedAt': now,
       'sourceNotes': sourceNotes,
-      if (date != null) 'date': date,
+      'date': ?date,
       'locations': locations,
       if (status == 'published') 'publishedAt': now,
     });
@@ -82,15 +82,19 @@ class FirestoreStoryRepository {
   }) {
     final data = <String, dynamic>{'kind': kind, 'uploadedBy': uploadedBy};
     data['order'] = order;
-    if (fileName?.trim().isNotEmpty == true)
+    if (fileName?.trim().isNotEmpty == true) {
       data['fileName'] = fileName!.trim();
+    }
     if (caption?.trim().isNotEmpty == true) data['caption'] = caption!.trim();
-    if (sourceNote?.trim().isNotEmpty == true)
+    if (sourceNote?.trim().isNotEmpty == true) {
       data['sourceNote'] = sourceNote!.trim();
-    if (storagePath?.trim().isNotEmpty == true)
+    }
+    if (storagePath?.trim().isNotEmpty == true) {
       data['storagePath'] = storagePath!.trim();
-    if (mimeType?.trim().isNotEmpty == true)
+    }
+    if (mimeType?.trim().isNotEmpty == true) {
       data['mimeType'] = mimeType!.trim();
+    }
     return _firestore
         .collection('stories')
         .doc(storyId)

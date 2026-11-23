@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -10,6 +10,7 @@ import 'data/family_repository.dart';
 import 'data/question_repository.dart';
 import 'data/user_repository.dart';
 import 'data/timeline_repository.dart';
+import 'data/discovery_repository.dart';
 import 'firebase_options.dart';
 
 Future<void> main() async {
@@ -193,7 +194,7 @@ class _HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     final pages = [
-      ExplorePage(onStoryTap: _openStory),
+      Slice3Explore(onStoryTap: _openStory),
       CreatePage(
         onStoryCreated: (story) {
           setState(() {
@@ -243,6 +244,225 @@ class _HomeShellState extends State<HomeShell> {
   }
 }
 
+class Slice3Explore extends StatefulWidget {
+  const Slice3Explore({super.key, required this.onStoryTap});
+  final ValueChanged<Story> onStoryTap;
+  @override
+  State<Slice3Explore> createState() => _Slice3ExploreState();
+}
+
+class _Slice3ExploreState extends State<Slice3Explore> {
+  final _repository = const DiscoveryRepository();
+  var _map = true;
+  var _mode = DiscoveryMode.community;
+  var _filters = const DiscoveryFilters();
+  var _showFilters = false;
+  final _search = TextEditingController();
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final stories = _repository.stories(mode: _mode, filters: _filters);
+    final timeline = _repository.timeline(mode: _mode, filters: _filters);
+    final clusters = _repository.clusters(stories);
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+      children: [
+        Text(
+          'Kindred',
+          style: Theme.of(context).textTheme.headlineMedium
+              ?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Explore the stories held by a place and its people.',
+          style: Theme.of(context).textTheme.bodyLarge,
+        ),
+        const SizedBox(height: 14),
+        const Card(
+          child: ListTile(
+            leading: Icon(Icons.auto_awesome_outlined),
+            title: Text('Today’s question'),
+            subtitle: Text(
+              'What is a meal that takes you back to a particular place or person?',
+            ),
+          ),
+        ),
+        const SizedBox(height: 18),
+        SegmentedButton<DiscoveryMode>(
+          segments: const [
+            ButtonSegment(
+              value: DiscoveryMode.community,
+              label: Text('Community'),
+            ),
+            ButtonSegment(value: DiscoveryMode.family, label: Text('Family')),
+          ],
+          selected: {_mode},
+          onSelectionChanged: (v) => setState(() => _mode = v.first),
+        ),
+        const SizedBox(height: 12),
+        SearchBar(
+          controller: _search,
+          hintText: 'Search stories, places, people',
+          leading: const Icon(Icons.search),
+          onChanged: (v) =>
+              setState(() => _filters = _filters.copyWith(query: v)),
+          trailing: [
+            IconButton(
+              tooltip: 'Show filters',
+              onPressed: () => setState(() => _showFilters = !_showFilters),
+              icon: const Icon(Icons.tune),
+            ),
+          ],
+        ),
+        if (_showFilters) _filterPanel(),
+        const SizedBox(height: 16),
+        SegmentedButton<bool>(
+          segments: const [
+            ButtonSegment(
+              value: true,
+              icon: Icon(Icons.map_outlined),
+              label: Text('Map'),
+            ),
+            ButtonSegment(
+              value: false,
+              icon: Icon(Icons.timeline_outlined),
+              label: Text('Timeline'),
+            ),
+          ],
+          selected: {_map},
+          onSelectionChanged: (v) => setState(() => _map = v.first),
+        ),
+        const SizedBox(height: 12),
+        if (stories.isEmpty)
+          const Card(
+            child: ListTile(
+              leading: Icon(Icons.search_off),
+              title: Text('No stories match these filters'),
+              subtitle: Text('Try widening your search or filters.'),
+            ),
+          )
+        else if (_map) ...[
+          Semantics(
+            label: 'Accessible story list',
+            header: true,
+            child: const Text(
+              'Story locations',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+          const SizedBox(height: 8),
+          ...clusters.entries.map(
+            (entry) => Card(
+              child: ExpansionTile(
+                leading: const Icon(Icons.location_on_outlined),
+                title: Text(
+                  '${entry.key} · ${entry.value.length} ${entry.value.length == 1 ? 'story' : 'stories'}',
+                ),
+                subtitle: const Text('Grouped nearby stories'),
+                children: entry.value
+                    .map(
+                      (s) => ListTile(
+                        title: Text(s.title),
+                        subtitle: Text('${s.date} · ${s.visibility}'),
+                        onTap: () => widget.onStoryTap(s),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+          ),
+        ] else ...[
+          Semantics(
+            label: 'Accessible timeline story list',
+            header: true,
+            child: const Text(
+              'Timeline',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+          ...timeline.entries.map(
+            (entry) => Card(
+              child: ExpansionTile(
+                leading: const Icon(Icons.event_outlined),
+                title: Text(entry.key),
+                subtitle: Text(
+                  '${entry.value.length} ${entry.value.length == 1 ? 'story' : 'stories'}',
+                ),
+                children: entry.value
+                    .map(
+                      (s) => ListTile(
+                        title: Text(s.title),
+                        subtitle: Text(
+                          '${s.type} · ${s.evidence} · ${s.visibility}',
+                        ),
+                        onTap: () => widget.onStoryTap(s),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _filterPanel() => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(12),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          _choice('Type', _filters.type, [
+            'All',
+            'Family',
+            'Local',
+            'Cultural',
+          ]),
+          _choice('Evidence', _filters.evidence, [
+            'All',
+            'Oral account',
+            'Firsthand memory',
+            'Unverified story',
+          ]),
+          _choice('Visibility', _filters.visibility, [
+            'All',
+            'Public',
+            'Family',
+            'Private',
+          ]),
+        ],
+      ),
+    ),
+  );
+
+  Widget _choice(String label, String value, List<String> values) =>
+      DropdownButton<String>(
+        value: value,
+        hint: Text(label),
+        items: values
+            .map((v) => DropdownMenuItem(value: v, child: Text('$label: $v')))
+            .toList(),
+        onChanged: (v) {
+          if (v == null) return;
+          setState(
+            () => _filters = label == 'Type'
+                ? _filters.copyWith(type: v)
+                : label == 'Evidence'
+                ? _filters.copyWith(evidence: v)
+                : _filters.copyWith(visibility: v),
+          );
+        },
+      );
+}
+
 class ExplorePage extends StatefulWidget {
   const ExplorePage({super.key, required this.onStoryTap});
   final ValueChanged<Story> onStoryTap;
@@ -253,7 +473,7 @@ class ExplorePage extends StatefulWidget {
 
 class _ExplorePageState extends State<ExplorePage> {
   bool _map = false;
-  bool _live = Firebase.apps.isNotEmpty;
+  final bool _live = Firebase.apps.isNotEmpty;
   String _filter = 'All';
 
   @override
@@ -469,13 +689,15 @@ class LiveStoryMap extends StatelessWidget {
       StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: FirestoreStoryRepository().watchPublicStories(),
         builder: (context, snapshot) {
-          if (snapshot.hasError)
+          if (snapshot.hasError) {
             return const ListTile(
               leading: Icon(Icons.cloud_off),
               title: Text('Live map unavailable'),
             );
-          if (!snapshot.hasData)
+          }
+          if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
+          }
           final count = snapshot.data!.docs
               .where(
                 (doc) =>
@@ -508,16 +730,18 @@ class TimelineLive extends StatelessWidget {
       StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: TimelineRepository().watchEvents(),
         builder: (context, snapshot) {
-          if (snapshot.hasError)
+          if (snapshot.hasError) {
             return const ListTile(
               leading: Icon(Icons.cloud_off),
               title: Text('Timeline unavailable'),
             );
-          if (!snapshot.hasData)
+          }
+          if (!snapshot.hasData) {
             return const Padding(
               padding: EdgeInsets.all(16),
               child: CircularProgressIndicator(),
             );
+          }
           if (snapshot.data!.docs.isEmpty) return const SizedBox.shrink();
           return Card(
             child: Column(
@@ -1141,8 +1365,9 @@ class _StoryFormState extends State<StoryForm> {
                       );
                       if (result != null &&
                           result.files.single.bytes != null &&
-                          mounted)
+                          mounted) {
                         setState(() => _pickedFile = result.files.single);
+                      }
                     },
                     icon: const Icon(Icons.upload_file),
                     label: Text(
@@ -1325,16 +1550,19 @@ class FamiliesPage extends StatelessWidget {
       StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: FamilyRepository().watchPublicFamilies(),
         builder: (context, snapshot) {
-          if (snapshot.hasError)
+          if (snapshot.hasError) {
             return const ListTile(
               leading: Icon(Icons.cloud_off),
               title: Text('Families unavailable'),
               subtitle: Text('Check your connection or permissions.'),
             );
-          if (!snapshot.hasData)
+          }
+          if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
-          if (snapshot.data!.docs.isEmpty)
+          }
+          if (snapshot.data!.docs.isEmpty) {
             return const Text('No public family groups yet.');
+          }
           return Column(
             children: snapshot.data!.docs.map((doc) {
               final data = doc.data();
@@ -1393,7 +1621,7 @@ class ProfilePage extends StatelessWidget {
             : AuthRepository().watchAuthState(),
         builder: (context, authSnapshot) {
           final uid = authSnapshot.data?.uid;
-          if (uid == null)
+          if (uid == null) {
             return const Card(
               child: ListTile(
                 leading: CircleAvatar(child: Icon(Icons.person)),
@@ -1401,14 +1629,16 @@ class ProfilePage extends StatelessWidget {
                 subtitle: Text('Sign in to load your profile.'),
               ),
             );
+          }
           return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
             stream: UserRepository().watchProfile(uid),
             builder: (context, snapshot) {
-              if (snapshot.hasError)
+              if (snapshot.hasError) {
                 return const ListTile(
                   leading: Icon(Icons.cloud_off),
                   title: Text('Profile unavailable'),
                 );
+              }
               final data = snapshot.data?.data();
               return Card(
                 child: ListTile(
@@ -1523,10 +1753,11 @@ class _AuthPageState extends State<AuthPage> {
     }
     try {
       await AuthRepository().sendPasswordReset(_email.text.trim());
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Password reset email sent.')),
         );
+      }
     } on FirebaseAuthException catch (error) {
       setState(() => _error = error.message ?? error.code);
     }
