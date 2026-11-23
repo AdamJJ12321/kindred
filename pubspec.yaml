@@ -43,6 +43,8 @@ dependencies:
   material_ui: any
   cupertino_ui: any
   google_sign_in: ^7.2.0
+  usa_zipcode_address_lookup: ^1.0.1
+  http: ^1.6.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

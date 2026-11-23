@@ -1,10 +1,15 @@
+import 'dart:convert';
+
 import 'package:material_ui/material_ui.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:http/http.dart' as http;
+import 'package:usa_zipcode_address_lookup/usa_zipcode_address_lookup.dart';
 
 import 'data/auth_repository.dart';
 import 'data/story_repository.dart';
@@ -13,6 +18,7 @@ import 'data/question_repository.dart';
 import 'data/user_repository.dart';
 import 'data/timeline_repository.dart';
 import 'data/discovery_repository.dart';
+import 'data/location_catalog.dart';
 import 'firebase_options.dart';
 
 Future<void> main() async {
@@ -1345,27 +1351,167 @@ class _StoryFormState extends State<StoryForm> {
   String _dateShape = 'single';
   final _dateStart = TextEditingController();
   final _dateEnd = TextEditingController();
-  final _locationLabel = TextEditingController();
   String _locationPrecision = '';
+  final _latitude = TextEditingController();
+  final _longitude = TextEditingController();
+  final _zipCode = TextEditingController();
+  final _citySearch = TextEditingController();
+  final _stateSearch = TextEditingController();
+  String _region = 'Northeast';
+  bool _lookingUpZip = false;
+  String? _locationError;
   final List<Map<String, dynamic>> _locations = [];
-  static const _usaCities = <String>[
-    'San Francisco, California',
-    'San Jose, California',
-    'San Diego, California',
-    'Santa Barbara, California',
-    'Santa Monica, California',
-    'Seattle, Washington',
-    'New York, New York',
-    'Newark, New Jersey',
-    'Chicago, Illinois',
-    'Boston, Massachusetts',
-    'Austin, Texas',
-    'Houston, Texas',
-    'Los Angeles, California',
-    'Oakland, California',
-    'Portland, Oregon',
-  ];
   bool _publishing = false;
+
+  @override
+  void dispose() {
+    _title.dispose();
+    _description.dispose();
+    _evidenceFile.dispose();
+    _evidenceCaption.dispose();
+    _evidenceSource.dispose();
+    _dateStart.dispose();
+    _dateEnd.dispose();
+    _latitude.dispose();
+    _longitude.dispose();
+    _zipCode.dispose();
+    _citySearch.dispose();
+    _stateSearch.dispose();
+    super.dispose();
+  }
+
+  void _resetLocationInputs() {
+    _latitude.clear();
+    _longitude.clear();
+    _zipCode.clear();
+    _citySearch.clear();
+    _stateSearch.clear();
+    _region = 'Northeast';
+    _locationError = null;
+  }
+
+  Future<void> _addLocation() async {
+    setState(() => _locationError = null);
+    switch (_locationPrecision) {
+      case 'exact':
+        final lat = double.tryParse(_latitude.text.trim());
+        final lng = double.tryParse(_longitude.text.trim());
+        if (lat == null || lng == null) {
+          setState(
+            () => _locationError = 'Enter valid latitude and longitude only.',
+          );
+          return;
+        }
+        if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+          setState(() => _locationError = 'Latitude/longitude out of range.');
+          return;
+        }
+        setState(() {
+          _locations.add({
+            'label': '${lat.toStringAsFixed(5)}, ${lng.toStringAsFixed(5)}',
+            'latitude': lat,
+            'longitude': lng,
+            'precision': 'exact',
+          });
+          _resetLocationInputs();
+        });
+        return;
+      case 'neighborhood':
+        final zip = _zipCode.text.trim();
+        if (!RegExp(r'^\d{5}(-\d{4})?$').hasMatch(zip)) {
+          setState(() => _locationError = 'Enter a 5-digit US ZIP code only.');
+          return;
+        }
+        setState(() => _lookingUpZip = true);
+        try {
+          final resolved = await _lookupUsZip(zip.split('-').first);
+          if (!mounted) return;
+          setState(() {
+            _locations.add({
+              'label':
+                  '${resolved.city}, ${resolved.stateCode.isEmpty ? resolved.stateName : resolved.stateCode} $zip',
+              'precision': 'neighborhood',
+              'zipCode': zip,
+              'city': resolved.city,
+              'state': resolved.stateName,
+              'stateCode': resolved.stateCode,
+            });
+            _resetLocationInputs();
+            _lookingUpZip = false;
+          });
+        } catch (error) {
+          if (!mounted) return;
+          setState(() {
+            _lookingUpZip = false;
+            _locationError =
+                'ZIP lookup failed. Check the code and try again.';
+          });
+        }
+        return;
+      case 'city':
+        final city = _citySearch.text.trim();
+        if (city.isEmpty) {
+          setState(() => _locationError = 'Choose or type a city only.');
+          return;
+        }
+        setState(() {
+          _locations.add({'label': city, 'precision': 'city', 'city': city});
+          _resetLocationInputs();
+        });
+        return;
+      case 'region':
+        final state = _stateSearch.text.trim();
+        if (state.isEmpty) {
+          setState(
+            () => _locationError = 'Pick a region and search a state.',
+          );
+          return;
+        }
+        setState(() {
+          _locations.add({
+            'label': '$_region · $state',
+            'precision': 'region',
+            'region': _region,
+            'state': state,
+          });
+          _resetLocationInputs();
+        });
+        return;
+      default:
+        setState(() => _locationError = 'Choose a location precision first.');
+    }
+  }
+
+  /// Uses usa_zipcode_address_lookup on mobile; Zippopotam on web (package is not web-ready).
+  Future<({String city, String stateName, String stateCode})> _lookupUsZip(
+    String zip,
+  ) async {
+    if (!kIsWeb) {
+      final found = await USAZipCodeAddressLookup.searchZipcode(zip);
+      return (
+        city: found.city.trim().isEmpty ? 'Unknown city' : found.city.trim(),
+        stateName: found.stateName.trim(),
+        stateCode: found.stateCode.trim(),
+      );
+    }
+    final response = await http.get(
+      Uri.parse('https://api.zippopotam.us/us/$zip'),
+    );
+    if (response.statusCode != 200) {
+      throw StateError('ZIP not found');
+    }
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final places = data['places'] as List<dynamic>?;
+    if (places == null || places.isEmpty) {
+      throw StateError('ZIP not found');
+    }
+    final place = places.first as Map<String, dynamic>;
+    return (
+      city: (place['place name'] as String?)?.trim() ?? 'Unknown city',
+      stateName: (place['state'] as String?)?.trim() ?? '',
+      stateCode: (place['state abbreviation'] as String?)?.trim() ?? '',
+    );
+  }
 
   Future<void> _pickDate(TextEditingController target) async {
     var selected = DateTime.tryParse(target.text) ?? DateTime(1968, 1, 1);
@@ -1570,28 +1716,144 @@ class _StoryFormState extends State<StoryForm> {
           ),
         ],
         const SizedBox(height: 14),
-        if (_locationPrecision.isNotEmpty)
+        DropdownButtonFormField<String>(
+          initialValue: _locationPrecision.isEmpty ? null : _locationPrecision,
+          decoration: const InputDecoration(
+            labelText: 'Location precision',
+            helperText:
+                'Exact = lat/long only · Neighborhood = ZIP only · City = city only · Region = region + state',
+            border: OutlineInputBorder(),
+          ),
+          items: const [
+            DropdownMenuItem(value: 'exact', child: Text('Exact')),
+            DropdownMenuItem(
+              value: 'neighborhood',
+              child: Text('Neighborhood'),
+            ),
+            DropdownMenuItem(value: 'city', child: Text('City')),
+            DropdownMenuItem(value: 'region', child: Text('Region')),
+          ],
+          onChanged: (v) => setState(() {
+            _locationPrecision = v!;
+            _resetLocationInputs();
+          }),
+        ),
+        if (_locationPrecision == 'exact') ...[
+          const SizedBox(height: 10),
+          TextField(
+            controller: _latitude,
+            keyboardType: const TextInputType.numberWithOptions(
+              decimal: true,
+              signed: true,
+            ),
+            decoration: const InputDecoration(
+              labelText: 'Latitude only',
+              hintText: 'e.g. 42.3314',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _longitude,
+            keyboardType: const TextInputType.numberWithOptions(
+              decimal: true,
+              signed: true,
+            ),
+            decoration: const InputDecoration(
+              labelText: 'Longitude only',
+              hintText: 'e.g. -83.0458',
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ],
+        if (_locationPrecision == 'neighborhood') ...[
+          const SizedBox(height: 10),
+          TextField(
+            controller: _zipCode,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'ZIP code only',
+              hintText: 'e.g. 48201',
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ],
+        if (_locationPrecision == 'city') ...[
+          const SizedBox(height: 10),
           Autocomplete<String>(
-            optionsBuilder: (value) {
-              if (value.text.trim().isEmpty || _locationPrecision != 'city') {
-                return const Iterable<String>.empty();
+            optionsBuilder: (value) =>
+                LocationCatalog.citiesMatching(value.text),
+            onSelected: (value) => _citySearch.text = value,
+            fieldViewBuilder: (context, controller, focusNode, onSubmitted) {
+              if (controller.text != _citySearch.text &&
+                  _citySearch.text.isNotEmpty &&
+                  controller.text.isEmpty) {
+                controller.text = _citySearch.text;
               }
-              final query = value.text.toLowerCase();
-              return _usaCities.where(
-                (city) => city.toLowerCase().startsWith(query),
+              controller.addListener(() => _citySearch.text = controller.text);
+              return TextField(
+                controller: controller,
+                focusNode: focusNode,
+                decoration: const InputDecoration(
+                  labelText: 'City only',
+                  hintText: 'Search Detroit, Miami, San Antonio…',
+                  border: OutlineInputBorder(),
+                ),
               );
             },
-            onSelected: (value) => _locationLabel.text = value,
+            optionsViewBuilder: (context, onSelected, options) => Align(
+              alignment: Alignment.topLeft,
+              child: Material(
+                elevation: 4,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxHeight: 220,
+                    maxWidth: 420,
+                  ),
+                  child: ListView(
+                    padding: EdgeInsets.zero,
+                    children: options
+                        .map(
+                          (city) => ListTile(
+                            title: Text(city),
+                            onTap: () => onSelected(city),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+        if (_locationPrecision == 'region') ...[
+          const SizedBox(height: 10),
+          DropdownButtonFormField<String>(
+            initialValue: _region,
+            decoration: const InputDecoration(
+              labelText: 'Region',
+              border: OutlineInputBorder(),
+            ),
+            items: LocationCatalog.regions
+                .map((r) => DropdownMenuItem(value: r, child: Text(r)))
+                .toList(),
+            onChanged: (v) => setState(() => _region = v!),
+          ),
+          const SizedBox(height: 10),
+          Autocomplete<String>(
+            optionsBuilder: (value) =>
+                LocationCatalog.statesMatching(value.text),
+            onSelected: (value) => _stateSearch.text = value,
             fieldViewBuilder: (context, controller, focusNode, onSubmitted) {
               controller.addListener(
-                () => _locationLabel.text = controller.text,
+                () => _stateSearch.text = controller.text,
               );
               return TextField(
                 controller: controller,
                 focusNode: focusNode,
                 decoration: const InputDecoration(
-                  labelText: 'USA city',
-                  hintText: 'Type e.g. san',
+                  labelText: 'State (search)',
+                  hintText: 'Type e.g. Mich',
                   border: OutlineInputBorder(),
                 ),
               );
@@ -1606,11 +1868,12 @@ class _StoryFormState extends State<StoryForm> {
                     maxWidth: 360,
                   ),
                   child: ListView(
+                    padding: EdgeInsets.zero,
                     children: options
                         .map(
-                          (city) => ListTile(
-                            title: Text(city),
-                            onTap: () => onSelected(city),
+                          (state) => ListTile(
+                            title: Text(state),
+                            onTap: () => onSelected(state),
                           ),
                         )
                         .toList(),
@@ -1619,39 +1882,45 @@ class _StoryFormState extends State<StoryForm> {
               ),
             ),
           ),
-        const SizedBox(height: 10),
-        DropdownButtonFormField<String>(
-          initialValue: _locationPrecision.isEmpty ? null : _locationPrecision,
-          decoration: const InputDecoration(
-            labelText: 'Location precision',
-            border: OutlineInputBorder(),
+        ],
+        if (_locationError != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            _locationError!,
+            style: TextStyle(color: Theme.of(context).colorScheme.error),
           ),
-          items: const [
-            DropdownMenuItem(value: 'exact', child: Text('Exact')),
-            DropdownMenuItem(
-              value: 'neighborhood',
-              child: Text('Neighborhood'),
-            ),
-            DropdownMenuItem(value: 'city', child: Text('City')),
-            DropdownMenuItem(value: 'region', child: Text('Region')),
-          ],
-          onChanged: (v) => setState(() => _locationPrecision = v!),
-        ),
-        const SizedBox(height: 10),
+        ],
+        if (_locations.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (var i = 0; i < _locations.length; i++)
+                InputChip(
+                  label: Text(
+                    '${_locations[i]['precision']}: ${_locations[i]['label']}',
+                  ),
+                  onDeleted: () => setState(() => _locations.removeAt(i)),
+                ),
+            ],
+          ),
+        ],
         const SizedBox(height: 8),
         OutlinedButton.icon(
-          onPressed: () {
-            if (_locationLabel.text.trim().isEmpty) return;
-            setState(() {
-              _locations.add({
-                'label': _locationLabel.text.trim(),
-                'precision': _locationPrecision,
-              });
-              _locationLabel.clear();
-            });
-          },
-          icon: const Icon(Icons.add_location_alt_outlined),
-          label: Text('Add location (${_locations.length})'),
+          onPressed: _lookingUpZip ? null : _addLocation,
+          icon: _lookingUpZip
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.add_location_alt_outlined),
+          label: Text(
+            _lookingUpZip
+                ? 'Looking up ZIP…'
+                : 'Add location (${_locations.length})',
+          ),
         ),
         const SizedBox(height: 18),
         OutlinedButton.icon(
