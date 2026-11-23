@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import 'data/auth_repository.dart';
 import 'data/story_repository.dart';
@@ -1478,8 +1479,7 @@ class _StoryFormState extends State<StoryForm> {
           initialValue: _visibility,
           decoration: const InputDecoration(
             labelText: 'Who can see it?',
-            helperText:
-                'Public: everyone. Private: you and your family members. Family/Invited: listed people only.',
+            helperText: 'Public: everyone. Private: you and your family members. Family/Invited: listed people only.',
             border: OutlineInputBorder(),
           ),
           items: [
@@ -2154,6 +2154,29 @@ class _AuthPageState extends State<AuthPage> {
     }
   }
 
+  Future<void> _signInWithGoogle() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await AuthRepository().signInWithGoogle();
+      if (mounted) Navigator.pop(context);
+    } on FirebaseAuthException catch (error) {
+      if (mounted) setState(() => _error = error.message ?? error.code);
+    } on GoogleSignInException catch (error) {
+      if (mounted) {
+        setState(() => _error = error.description ?? error.code.name);
+      }
+    } on UnsupportedError catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } catch (error) {
+      if (mounted) setState(() => _error = 'Google sign-in failed: $error');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: Text(_register ? 'Create account' : 'Sign in')),
@@ -2191,6 +2214,12 @@ class _AuthPageState extends State<AuthPage> {
           child: Text(
             _busy ? 'Please wait…' : (_register ? 'Create account' : 'Sign in'),
           ),
+        ),
+        const SizedBox(height: 10),
+        OutlinedButton.icon(
+          onPressed: _busy ? null : _signInWithGoogle,
+          icon: const Icon(Icons.login),
+          label: const Text('Continue with Google'),
         ),
         if (!_register)
           TextButton(
