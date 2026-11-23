@@ -2,6 +2,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
+class GoogleOnlyAccountException implements Exception {
+  const GoogleOnlyAccountException();
+  @override
+  String toString() => 'user-signed-up-with-google';
+}
+
 class AuthRepository {
   AuthRepository({FirebaseAuth? auth, FirebaseFirestore? firestore})
     : _auth = auth ?? FirebaseAuth.instance,
@@ -17,6 +23,10 @@ class AuthRepository {
     required String email,
     required String password,
   }) async {
+    final methods = await _signInMethods(email);
+    if (methods.contains('google.com') && !methods.contains('password')) {
+      throw const GoogleOnlyAccountException();
+    }
     final result = await _auth.createUserWithEmailAndPassword(
       email: email,
       password: password,
@@ -29,12 +39,31 @@ class AuthRepository {
     required String email,
     required String password,
   }) async {
-    final result = await _auth.signInWithEmailAndPassword(
-      email: email,
-      password: password,
-    );
-    await ensureUserProfile(result.user!);
-    return result;
+    final methods = await _signInMethods(email);
+    if (methods.contains('google.com') && !methods.contains('password')) {
+      throw const GoogleOnlyAccountException();
+    }
+    try {
+      final result = await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      await ensureUserProfile(result.user!);
+      return result;
+    } on FirebaseAuthException catch (error) {
+      if (error.code == 'user-not-found' && methods.contains('google.com')) {
+        throw const GoogleOnlyAccountException();
+      }
+      rethrow;
+    }
+  }
+
+  Future<List<String>> _signInMethods(String email) async {
+    // Firebase deprecated this client-side discovery API in favor of
+    // provider-neutral errors, but it is still the only safe way to explain
+    // the Google-only/password mismatch to the user in this flow.
+    // ignore: deprecated_member_use
+    return _auth.fetchSignInMethodsForEmail(email);
   }
 
   Future<void> sendPasswordReset(String email) =>

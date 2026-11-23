@@ -2130,6 +2130,12 @@ class _AuthPageState extends State<AuthPage> {
         await auth.signIn(email: _email.text.trim(), password: _password.text);
       }
       if (mounted) Navigator.pop(context);
+    } on GoogleOnlyAccountException {
+      if (mounted) {
+        setState(
+          () => _error = 'User signed up with Google. Use the “Continue with Google” option instead.',
+        );
+      }
     } on FirebaseAuthException catch (error) {
       setState(() => _error = error.message ?? error.code);
     } finally {
