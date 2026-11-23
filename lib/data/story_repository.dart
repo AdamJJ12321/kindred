@@ -57,6 +57,24 @@ class FirestoreStoryRepository {
     });
   }
 
+  /// Stores the previous user-authored content before an edit so the original
+  /// wording remains recoverable without introducing a separate history UI.
+  Future<void> updateStoryWithHistory({
+    required String storyId,
+    required String previousTitle,
+    required String previousDescription,
+    required Map<String, dynamic> changes,
+  }) {
+    return _firestore.collection('stories').doc(storyId).update({
+      ...changes,
+      'originalContent': {
+        'title': previousTitle,
+        'description': previousDescription,
+      },
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
   Future<void> publishStory(String storyId) => updateStory(storyId, {
     'status': 'published',
     'publishedAt': FieldValue.serverTimestamp(),
@@ -132,6 +150,43 @@ class FirestoreStoryRepository {
       mimeType: mimeType,
       order: order,
     );
+  }
+
+  Future<DocumentReference<Map<String, dynamic>>> uploadEvidenceWithRetry({
+    required String storyId,
+    required String uploadedBy,
+    required String kind,
+    required String fileName,
+    required List<int> bytes,
+    String? mimeType,
+    String? caption,
+    String? sourceNote,
+    int order = 0,
+  }) async {
+    Object? lastError;
+    for (var attempt = 0; attempt < 3; attempt++) {
+      try {
+        return await uploadEvidence(
+          storyId: storyId,
+          uploadedBy: uploadedBy,
+          kind: kind,
+          fileName: fileName,
+          bytes: bytes,
+          mimeType: mimeType,
+          caption: caption,
+          sourceNote: sourceNote,
+          order: order,
+        );
+      } catch (error) {
+        lastError = error;
+        if (attempt < 2) {
+          await Future<void>.delayed(
+            Duration(milliseconds: 250 * (attempt + 1)),
+          );
+        }
+      }
+    }
+    throw lastError ?? StateError('Evidence upload failed');
   }
 
   Future<void> updateEvidence(

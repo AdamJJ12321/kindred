@@ -1,4 +1,5 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -888,7 +889,17 @@ class StoryDetail extends StatelessWidget {
   final Story story;
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Story')),
+    appBar: AppBar(
+      title: const Text('Story'),
+      actions: [
+        if (story.storyId != null)
+          IconButton(
+            tooltip: 'Edit story',
+            icon: const Icon(Icons.edit_outlined),
+            onPressed: () => _editStory(context),
+          ),
+      ],
+    ),
     body: ListView(
       padding: const EdgeInsets.all(20),
       children: [
@@ -942,6 +953,75 @@ class StoryDetail extends StatelessWidget {
       ],
     ),
   );
+
+  Future<void> _editStory(BuildContext context) async {
+    final title = TextEditingController(text: story.title);
+    final description = TextEditingController(text: story.description);
+    final result = await showDialog<(String, String)>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Edit story'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: title,
+              decoration: const InputDecoration(labelText: 'Title'),
+            ),
+            TextField(
+              controller: description,
+              maxLines: 4,
+              decoration: const InputDecoration(labelText: 'Description'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, (
+              title.text.trim(),
+              description.text.trim(),
+            )),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (result == null ||
+        result.$1.isEmpty ||
+        story.storyId == null ||
+        !context.mounted) {
+      return;
+    }
+    try {
+      await FirestoreStoryRepository().updateStoryWithHistory(
+        storyId: story.storyId!,
+        previousTitle: story.title,
+        previousDescription: story.description,
+        changes: {'title': result.$1, 'description': result.$2},
+      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Story updated; original content preserved.'),
+          ),
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Could not save changes. Check your connection and retry.',
+            ),
+          ),
+        );
+      }
+    }
+  }
 }
 
 class EvidenceLive extends StatelessWidget {
@@ -993,6 +1073,33 @@ class EvidenceLive extends StatelessWidget {
                   'Evidence',
             ),
             subtitle: description.isEmpty ? null : Text(description),
+            trailing: PopupMenuButton<String>(
+              tooltip: 'Evidence actions',
+              onSelected: (action) async {
+                final repository = FirestoreStoryRepository();
+                if (action == 'delete') {
+                  await repository.deleteEvidence(
+                    storyId,
+                    doc.id,
+                    storagePath: data['storagePath'] as String?,
+                  );
+                } else if (action == 'edit' && context.mounted) {
+                  final caption = await _editEvidence(
+                    context,
+                    data['caption'] as String? ?? '',
+                  );
+                  if (caption != null) {
+                    await repository.updateEvidence(storyId, doc.id, {
+                      'caption': caption,
+                    });
+                  }
+                }
+              },
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 'edit', child: Text('Edit caption')),
+                PopupMenuItem(value: 'delete', child: Text('Delete evidence')),
+              ],
+            ),
           );
         }).toList();
         return Card(
@@ -1005,11 +1112,62 @@ class EvidenceLive extends StatelessWidget {
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
-              ...items,
+              ReorderableListView(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                onReorderItem: (oldIndex, newIndex) async {
+                  final ids = snapshot.data!.docs.map((doc) => doc.id).toList();
+                  final id = ids.removeAt(oldIndex);
+                  ids.insert(newIndex, id);
+                  await FirestoreStoryRepository().reorderEvidence(
+                    storyId,
+                    ids,
+                  );
+                },
+                children: items
+                    .toList()
+                    .asMap()
+                    .entries
+                    .map(
+                      (entry) => KeyedSubtree(
+                        key: ValueKey(snapshot.data!.docs[entry.key].id),
+                        child: entry.value,
+                      ),
+                    )
+                    .toList(),
+              ),
             ],
           ),
         );
       },
+    );
+  }
+
+  static Future<String?> _editEvidence(
+    BuildContext context,
+    String initial,
+  ) async {
+    final controller = TextEditingController(text: initial);
+    return showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Edit caption'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'Caption'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1104,7 +1262,7 @@ class _StoryFormState extends State<StoryForm> {
   String _evidence = 'Oral account';
   String _visibility = 'Public';
   String _status = 'published';
-  PlatformFile? _pickedFile;
+  final List<PlatformFile> _pickedFiles = [];
   String _dateKind = 'approximate';
   final _dateStart = TextEditingController();
   final _dateEnd = TextEditingController();
@@ -1114,6 +1272,51 @@ class _StoryFormState extends State<StoryForm> {
   String _locationPrecision = 'city';
   final List<Map<String, dynamic>> _locations = [];
   bool _publishing = false;
+
+  Future<void> _pickDate(TextEditingController target) async {
+    var selected = DateTime.tryParse(target.text) ?? DateTime(1968, 1, 1);
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) => SizedBox(
+        height: 330,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Choose a date',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      target.text =
+                          '${selected.year}-${selected.month.toString().padLeft(2, '0')}-${selected.day.toString().padLeft(2, '0')}';
+                      Navigator.pop(sheetContext);
+                    },
+                    child: const Text('Done'),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: CupertinoDatePicker(
+                mode: CupertinoDatePickerMode.date,
+                initialDateTime: selected,
+                minimumDate: DateTime(1000),
+                maximumDate: DateTime(2100),
+                onDateTimeChanged: (value) => selected = value,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Share a story')),
@@ -1216,6 +1419,8 @@ class _StoryFormState extends State<StoryForm> {
         const SizedBox(height: 10),
         TextField(
           controller: _dateStart,
+          readOnly: true,
+          onTap: () => _pickDate(_dateStart),
           decoration: const InputDecoration(
             labelText: 'Date or year',
             hintText: 'e.g. 1968-06-12',
@@ -1226,6 +1431,8 @@ class _StoryFormState extends State<StoryForm> {
           const SizedBox(height: 10),
           TextField(
             controller: _dateEnd,
+            readOnly: true,
+            onTap: () => _pickDate(_dateEnd),
             decoration: const InputDecoration(
               labelText: 'End date or year',
               border: OutlineInputBorder(),
@@ -1352,6 +1559,7 @@ class _StoryFormState extends State<StoryForm> {
                   OutlinedButton.icon(
                     onPressed: () async {
                       final result = await FilePicker.platform.pickFiles(
+                        allowMultiple: true,
                         withData: true,
                         type: FileType.custom,
                         allowedExtensions: [
@@ -1363,17 +1571,21 @@ class _StoryFormState extends State<StoryForm> {
                           'docx',
                         ],
                       );
-                      if (result != null &&
-                          result.files.single.bytes != null &&
-                          mounted) {
-                        setState(() => _pickedFile = result.files.single);
+                      if (result != null && mounted) {
+                        setState(
+                          () => _pickedFiles
+                            ..clear()
+                            ..addAll(
+                              result.files.where((file) => file.bytes != null),
+                            ),
+                        );
                       }
                     },
                     icon: const Icon(Icons.upload_file),
                     label: Text(
-                      _pickedFile == null
-                          ? 'Choose photo or document'
-                          : _pickedFile!.name,
+                      _pickedFiles.isEmpty
+                          ? 'Choose photos or documents'
+                          : '${_pickedFiles.length} file(s) selected',
                     ),
                   ),
                 ],
@@ -1428,26 +1640,27 @@ class _StoryFormState extends State<StoryForm> {
                                 },
                           locations: _locations,
                         );
-                    if (_pickedFile?.bytes != null) {
-                      final extension = _pickedFile!.extension?.toLowerCase();
+                    for (final pickedFile in _pickedFiles) {
+                      final extension = pickedFile.extension?.toLowerCase();
                       final isDocument = [
                         'pdf',
                         'doc',
                         'docx',
                       ].contains(extension);
-                      await FirestoreStoryRepository().uploadEvidence(
+                      await FirestoreStoryRepository().uploadEvidenceWithRetry(
                         storyId: storyId.id,
                         uploadedBy: user.uid,
                         kind: isDocument ? 'document' : 'photograph',
-                        fileName: _pickedFile!.name,
-                        bytes: _pickedFile!.bytes!,
+                        fileName: pickedFile.name,
+                        bytes: pickedFile.bytes!,
                         mimeType: isDocument
                             ? 'application/octet-stream'
                             : 'image/${extension == 'jpg' ? 'jpeg' : extension}',
                         sourceNote: _evidenceSource.text,
+                        order: _pickedFiles.indexOf(pickedFile),
                       );
                     }
-                    if (_pickedFile == null &&
+                    if (_pickedFiles.isEmpty &&
                         (_evidenceFile.text.trim().isNotEmpty ||
                             _evidenceCaption.text.trim().isNotEmpty ||
                             _evidenceSource.text.trim().isNotEmpty)) {
