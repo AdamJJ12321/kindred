@@ -1263,7 +1263,8 @@ class _StoryFormState extends State<StoryForm> {
   String _visibility = 'Public';
   String _status = 'published';
   final List<PlatformFile> _pickedFiles = [];
-  String _dateKind = 'approximate';
+  String _dateConfidence = 'approximate';
+  String _dateShape = 'single';
   final _dateStart = TextEditingController();
   final _dateEnd = TextEditingController();
   final _locationLabel = TextEditingController();
@@ -1271,6 +1272,23 @@ class _StoryFormState extends State<StoryForm> {
   final _locationLongitude = TextEditingController();
   String _locationPrecision = 'city';
   final List<Map<String, dynamic>> _locations = [];
+  static const _usaCities = <String>[
+    'San Francisco, California',
+    'San Jose, California',
+    'San Diego, California',
+    'Santa Barbara, California',
+    'Santa Monica, California',
+    'Seattle, Washington',
+    'New York, New York',
+    'Newark, New Jersey',
+    'Chicago, Illinois',
+    'Boston, Massachusetts',
+    'Austin, Texas',
+    'Houston, Texas',
+    'Los Angeles, California',
+    'Oakland, California',
+    'Portland, Oregon',
+  ];
   bool _publishing = false;
 
   Future<void> _pickDate(TextEditingController target) async {
@@ -1302,13 +1320,22 @@ class _StoryFormState extends State<StoryForm> {
               ),
             ),
             Expanded(
-              child: CupertinoDatePicker(
-                mode: CupertinoDatePickerMode.date,
-                initialDateTime: selected,
-                minimumDate: DateTime(1000),
-                maximumDate: DateTime(2100),
-                onDateTimeChanged: (value) => selected = value,
-              ),
+              child: _dateConfidence == 'exact'
+                  ? CupertinoDatePicker(
+                      mode: CupertinoDatePickerMode.date,
+                      initialDateTime: selected,
+                      minimumDate: DateTime(1000),
+                      maximumDate: DateTime(2100),
+                      onDateTimeChanged: (value) => selected = value,
+                    )
+                  : CupertinoDatePicker(
+                      mode: CupertinoDatePickerMode.monthYear,
+                      initialDateTime: selected,
+                      minimumDate: DateTime(1000),
+                      maximumDate: DateTime(2100),
+                      onDateTimeChanged: (value) =>
+                          selected = DateTime(value.year, value.month),
+                    ),
             ),
           ],
         ),
@@ -1400,21 +1427,47 @@ class _StoryFormState extends State<StoryForm> {
           onChanged: (v) => setState(() => _status = v!),
         ),
         const SizedBox(height: 14),
-        DropdownButtonFormField<String>(
-          initialValue: _dateKind,
-          decoration: const InputDecoration(
-            labelText: 'Date confidence',
-            border: OutlineInputBorder(),
-          ),
-          items: const [
-            DropdownMenuItem(value: 'exact', child: Text('Exact date')),
-            DropdownMenuItem(
-              value: 'approximate',
-              child: Text('Approximate date'),
+        Row(
+          children: [
+            Expanded(
+              child: DropdownButtonFormField<String>(
+                initialValue: _dateConfidence,
+                decoration: const InputDecoration(
+                  labelText: 'Confidence',
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(
+                    value: 'approximate',
+                    child: Text('Approximate'),
+                  ),
+                  DropdownMenuItem(value: 'exact', child: Text('Exact')),
+                ],
+                onChanged: (v) => setState(() => _dateConfidence = v!),
+              ),
             ),
-            DropdownMenuItem(value: 'range', child: Text('Date range')),
+            const SizedBox(width: 10),
+            Expanded(
+              child: DropdownButtonFormField<String>(
+                initialValue: _dateShape,
+                decoration: const InputDecoration(
+                  labelText: 'Shape',
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'single', child: Text('Date')),
+                  DropdownMenuItem(value: 'range', child: Text('Date range')),
+                ],
+                onChanged: (v) => setState(() => _dateShape = v!),
+              ),
+            ),
           ],
-          onChanged: (v) => setState(() => _dateKind = v!),
+        ),
+        const Padding(
+          padding: EdgeInsets.only(top: 6),
+          child: Text(
+            'Approximate dates use month and year only. Exact dates include the day.',
+          ),
         ),
         const SizedBox(height: 10),
         TextField(
@@ -1423,11 +1476,11 @@ class _StoryFormState extends State<StoryForm> {
           onTap: () => _pickDate(_dateStart),
           decoration: const InputDecoration(
             labelText: 'Date or year',
-            hintText: 'e.g. 1968-06-12',
+            hintText: 'Scroll to choose',
             border: OutlineInputBorder(),
           ),
         ),
-        if (_dateKind == 'range') ...[
+        if (_dateShape == 'range') ...[
           const SizedBox(height: 10),
           TextField(
             controller: _dateEnd,
@@ -1440,12 +1493,50 @@ class _StoryFormState extends State<StoryForm> {
           ),
         ],
         const SizedBox(height: 14),
-        TextField(
-          controller: _locationLabel,
-          decoration: const InputDecoration(
-            labelText: 'Location label',
-            hintText: 'e.g. Oakland Chinatown',
-            border: OutlineInputBorder(),
+        Autocomplete<String>(
+          optionsBuilder: (value) {
+            if (value.text.trim().isEmpty || _locationPrecision != 'city') {
+              return const Iterable<String>.empty();
+            }
+            final query = value.text.toLowerCase();
+            return _usaCities.where(
+              (city) => city.toLowerCase().startsWith(query),
+            );
+          },
+          onSelected: (value) => _locationLabel.text = value,
+          fieldViewBuilder: (context, controller, focusNode, onSubmitted) {
+            controller.addListener(() => _locationLabel.text = controller.text);
+            return TextField(
+              controller: controller,
+              focusNode: focusNode,
+              decoration: const InputDecoration(
+                labelText: 'USA city',
+                hintText: 'Type e.g. san',
+                border: OutlineInputBorder(),
+              ),
+            );
+          },
+          optionsViewBuilder: (context, onSelected, options) => Align(
+            alignment: Alignment.topLeft,
+            child: Material(
+              elevation: 4,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxHeight: 220,
+                  maxWidth: 360,
+                ),
+                child: ListView(
+                  children: options
+                      .map(
+                        (city) => ListTile(
+                          title: Text(city),
+                          onTap: () => onSelected(city),
+                        ),
+                      )
+                      .toList(),
+                ),
+              ),
+            ),
           ),
         ),
         const SizedBox(height: 10),
@@ -1588,6 +1679,46 @@ class _StoryFormState extends State<StoryForm> {
                           : '${_pickedFiles.length} file(s) selected',
                     ),
                   ),
+                  if (_pickedFiles.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Selected files',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    ..._pickedFiles.asMap().entries.map((entry) {
+                      final file = entry.value;
+                      final isImage =
+                          file.extension != null &&
+                          [
+                            'jpg',
+                            'jpeg',
+                            'png',
+                          ].contains(file.extension!.toLowerCase());
+                      return ListTile(
+                        leading: isImage && file.bytes != null
+                            ? Image.memory(
+                                file.bytes!,
+                                width: 48,
+                                height: 48,
+                                fit: BoxFit.cover,
+                              )
+                            : const Icon(Icons.insert_drive_file_outlined),
+                        title: Text(file.name),
+                        subtitle: Text(
+                          '${((file.size) / 1024).toStringAsFixed(0)} KB',
+                        ),
+                        trailing: IconButton(
+                          tooltip: 'Remove file',
+                          icon: const Icon(Icons.close),
+                          onPressed: () =>
+                              setState(() => _pickedFiles.removeAt(entry.key)),
+                        ),
+                      );
+                    }),
+                  ],
                 ],
               ),
             ),
@@ -1632,9 +1763,9 @@ class _StoryFormState extends State<StoryForm> {
                           date: _dateStart.text.trim().isEmpty
                               ? null
                               : {
-                                  'kind': _dateKind,
+                                  'kind': _dateConfidence,
                                   'start': _dateStart.text.trim(),
-                                  if (_dateKind == 'range' &&
+                                  if (_dateShape == 'range' &&
                                       _dateEnd.text.trim().isNotEmpty)
                                     'end': _dateEnd.text.trim(),
                                 },
