@@ -1,16 +1,89 @@
 {
-  "users": {
-    "user_student_001": {"displayName": "Maya Chen", "preferredLanguage": "en", "timeZone": "America/Los_Angeles"},
-    "user_storyteller_001": {"displayName": "Lina Chen", "preferredLanguage": "zh", "timeZone": "America/Los_Angeles"}
+  "accounts": {
+    "existing": [
+      {
+        "email": "jinadam62@gmail.com",
+        "uid": "QjO1kzXbytMUxIu4WHfgE0V8CX23",
+        "displayName": "Adam Jin"
+      },
+      {
+        "email": "jack.hogan99@gmail.com",
+        "uid": "m74npTPpWmbvffGLf1RWCenSVGs2",
+        "displayName": "Jack Hogan"
+      }
+    ],
+    "demo": [
+      {
+        "email": "maya.chen.kindred@example.com",
+        "uid": "fXwjPkOVpQg198GDqtWC8dRtsdw2",
+        "displayName": "Maya Chen",
+        "password": "KindredDemo1!"
+      },
+      {
+        "email": "lina.chen.kindred@example.com",
+        "uid": "F1wRqf5PFWW20Is2bR6UJAP4SHo2",
+        "displayName": "Lina Chen",
+        "password": "KindredDemo1!"
+      },
+      {
+        "email": "omar.rivera.kindred@example.com",
+        "uid": "1SWC5aqK1zgqTrohAXfMP74VRBh1",
+        "displayName": "Omar Rivera",
+        "password": "KindredDemo1!"
+      }
+    ]
   },
-  "families": {
-    "family_chen": {"name": "The Chen Family", "description": "Stories and memories shared by the Chen family.", "visibility": "public", "ownerId": "user_student_001"}
-  },
-  "stories": {
-    "story_market_fire": {"creatorId": "user_storyteller_001", "title": "The market fire of 1968", "description": "A remembered account of the night the neighborhood market burned.", "storyType": "local", "evidenceType": "firsthand_memory", "visibility": "public", "status": "published", "familyIds": []},
-    "story_railway_kitchen": {"creatorId": "user_student_001", "title": "Sunday noodles near the old railway", "description": "A family recipe and the neighborhood where it became a tradition.", "storyType": "family", "evidenceType": "oral_account", "visibility": "family", "status": "published", "familyIds": ["family_chen"], "familyMemberIds": ["user_student_001"]}
-  },
-  "dailyQuestions": {
-    "question_first_kitchen": {"prompt": "What is a meal that takes you back to a particular place or person?", "category": "food", "language": "en", "activeDate": "2026-01-01"}
-  }
+  "stories": [
+    {
+      "title": "Sunday noodles near the old railway",
+      "storyType": "family",
+      "creatorEmail": "jinadam62@gmail.com"
+    },
+    {
+      "title": "Lanterns on Lunar New Year",
+      "storyType": "cultural",
+      "creatorEmail": "jinadam62@gmail.com"
+    },
+    {
+      "title": "The market fire of 1968",
+      "storyType": "local",
+      "creatorEmail": "jack.hogan99@gmail.com"
+    },
+    {
+      "title": "Grandmother’s sewing box",
+      "storyType": "family",
+      "creatorEmail": "jack.hogan99@gmail.com"
+    },
+    {
+      "title": "Oakland Chinatown parade route",
+      "storyType": "local",
+      "creatorEmail": "maya.chen.kindred@example.com"
+    },
+    {
+      "title": "Mid-Autumn mooncakes at school",
+      "storyType": "cultural",
+      "creatorEmail": "maya.chen.kindred@example.com"
+    },
+    {
+      "title": "Harvest festival in the East Bay hills",
+      "storyType": "cultural",
+      "creatorEmail": "lina.chen.kindred@example.com"
+    },
+    {
+      "title": "Auntie’s courtyard garden",
+      "storyType": "family",
+      "creatorEmail": "lina.chen.kindred@example.com"
+    },
+    {
+      "title": "When the trolley stopped on Fruitvale",
+      "storyType": "local",
+      "creatorEmail": "omar.rivera.kindred@example.com"
+    },
+    {
+      "title": "Dia de los Muertos ofrenda at home",
+      "storyType": "cultural",
+      "creatorEmail": "omar.rivera.kindred@example.com"
+    }
+  ],
+  "notes": "Seeded into Firebase project my1stapp-b4b47 via scripts/seed-fake-stories.mjs. All stories are public + published. Re-run the script only if you need another batch (it creates additional story docs)."
 }
